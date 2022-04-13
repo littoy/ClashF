@@ -42,7 +42,7 @@ void main() async {
     // Hide window title bar
     await windowManager.setTitleBarStyle('hidden');
     await windowManager.setSize(const Size(290, 460));
-    // await windowManager.center();
+    await windowManager.center();
     await windowManager.show();
     await windowManager.setSkipTaskbar(true);
   });
@@ -182,7 +182,7 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+  bool _runing = false;
   String _runState = 'Stoped';
   bool _tunmode = false;
   String _result = '';
@@ -197,32 +197,77 @@ class _MyHomePageState extends State<MyHomePage> {
     await windowManager.show();
     // await windowManager.setSkipTaskbar(false);
   }
+
   Future<void> hide() async {
     await windowManager.hide();
     // await windowManager.setSkipTaskbar(true);
   }
-  Future<void> close() async {
-    await windowManager.close();
+
+  Future<void> quit() async {
+    if (_runing) {
+      await _switch();
+    }
+    await windowManager.destroy();
+  }
+
+  Future<void> updateSystemTrayMenu() async {
+    var runLabel = 'Stop';
+    var tunLabel = 'TUN';
+    var ruleLabel = 'rule';
+    var globalLabel = 'global';
+    var directLabel = 'direct';
+    if (_runing) {
+      runLabel = '✔Runing';
+    }
+    if (_tunmode) {
+      tunLabel = '✔TUN';
+    }
+    final menu = [
+      MenuItem(label: 'Show', onClicked: show),
+      MenuItem(
+          label: runLabel,
+          onClicked: () {
+            _switch();
+          }),
+      MenuItem(
+          label: tunLabel,
+          onClicked: () {
+            _patchConfig('', _tunmode ? 'false' : 'true');
+          }),
+      SubMenu(
+        label: "Mode",
+        children: [
+          MenuItem(
+            label: (_mode == 'rule' ? '✔' : '') + ruleLabel,
+            onClicked: () {},
+          ),
+          MenuItem(
+            label: (_mode == 'direct' ? '✔' : '') + directLabel,
+            onClicked: () {},
+          ),
+          MenuItem(
+            label: (_mode == 'global' ? '✔' : '') + globalLabel,
+            onClicked: () {},
+          ),
+        ],
+      ),
+      MenuItem(label: 'Hide', onClicked: hide),
+      MenuSeparator(),
+      MenuItem(label: 'Exit', onClicked: quit),
+    ];
+    await _systemTray.setContextMenu(menu);
   }
 
   Future<void> initSystemTray() async {
     String path =
         Platform.isWindows ? 'assets/app_icon.ico' : 'assets/app_icon.png';
-
-    final menu = [
-      MenuItem(label: 'Show', onClicked: show),
-      MenuItem(label: 'Hide', onClicked: hide),
-      MenuItem(label: 'Exit', onClicked: close),
-    ];
-
     // We first init the systray menu and then add the menu entries
     await _systemTray.initSystemTray(
       title: "",
       iconPath: path,
     );
 
-    await _systemTray.setContextMenu(menu);
-
+    await updateSystemTrayMenu();
     // handle system tray event
     _systemTray.registerSystemTrayEventHandler((eventName) {
       debugPrint("eventName: $eventName");
@@ -231,7 +276,7 @@ class _MyHomePageState extends State<MyHomePage> {
         _systemTray.popUpContextMenu();
       } else if (eventName == "rightMouseDown") {
       } else if (eventName == "rightMouseUp") {
-        _appWindow.show();
+        _systemTray.popUpContextMenu();
       }
     });
   }
@@ -239,13 +284,11 @@ class _MyHomePageState extends State<MyHomePage> {
   void _connectws() async {
     WebSocket.connect("ws://127.0.0.1:9090/traffic?token=").then((ws) {
       // create the stream channel
-      if (_counter == 0) {
-        setState(() {
-          icon = const Icon(Icons.stop_circle);
-          _runState = 'Runing';
-          _counter = 1;
-        });
-      }
+      setState(() {
+        icon = const Icon(Icons.stop_circle);
+        _runState = 'Runing';
+        _runing = true;
+      });
       _channel = IOWebSocketChannel(ws);
       _channel.stream.listen((message) {
         setState(() {
@@ -280,17 +323,17 @@ class _MyHomePageState extends State<MyHomePage> {
       startCMD = getCoreDir() + "win\\start.cmd";
       stopCMD = getCoreDir() + "win\\stop.cmd";
     }
-    _counter++;
+    _runing = !_runing;
     setState(() {
       // This call to setState tells the Flutter framework that something has
       // changed in this State, which causes it to rerun the build method below
       // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
+      // _runing without calling setState(), then the build method would not be
       // called again, and so nothing would appear to happen.
-      _runState = (_counter % 2 == 0) ? 'Stoped' : 'Runing';
+      _runState = _runing ? 'Runing' : 'Stoped';
     });
-    if (_runState == 'Runing') {
-      run(startCMD)
+    if (_runing) {
+      await run(startCMD)
           .then((result) => {
                 Future.delayed(const Duration(seconds: 1), () {
                   _connectws();
@@ -299,13 +342,20 @@ class _MyHomePageState extends State<MyHomePage> {
                   _result = result.outText;
                   icon = const Icon(Icons.stop_circle);
                 })
-              })
-          .catchError((onError) {
-        print('start error!');
-        print(onError);
-      });
+              }).catchError((onError) {
+                Future.delayed(const Duration(seconds: 1), () {
+                  _connectws();
+                });
+                setState(() {
+                  _result = '';
+                  _runing = false;
+                  icon = const Icon(Icons.play_circle);
+                });
+                print('start error!');
+                print(onError);
+              });
     } else {
-      run(stopCMD)
+      await run(stopCMD)
           .then((result) => {
                 // _closews(),
                 setState(() {
@@ -313,15 +363,10 @@ class _MyHomePageState extends State<MyHomePage> {
                   icon = const Icon(Icons.play_circle);
                   _tunmode = false;
                 })
-              })
-          .catchError((onError) {
-        setState(() {
-          _result = '';
-          icon = const Icon(Icons.play_circle);
-        });
-        print('stop error!');
-        print(onError);
-      });
+              }).catchError((onError) {
+                print('stop error!');
+                print(onError);
+              });
     }
   }
 
@@ -407,6 +452,7 @@ class _MyHomePageState extends State<MyHomePage> {
         _tunmode = false;
       });
     }
+    updateSystemTrayMenu();
   }
 
   Future<void> _patchConfig(String mode, String tun) async {
