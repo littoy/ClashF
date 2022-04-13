@@ -43,8 +43,8 @@ void main() async {
     await windowManager.setTitleBarStyle('hidden');
     await windowManager.setSize(const Size(290, 460));
     await windowManager.center();
-    await windowManager.show();
-    await windowManager.setSkipTaskbar(true);
+    await windowManager.hide();
+    // await windowManager.setSkipTaskbar(true);
   });
 
   final storage = new LocalStorage('mainconf.json');
@@ -195,12 +195,12 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> show() async {
     await windowManager.show();
-    // await windowManager.setSkipTaskbar(false);
+    await windowManager.setSkipTaskbar(false);
   }
 
   Future<void> hide() async {
     await windowManager.hide();
-    // await windowManager.setSkipTaskbar(true);
+    await windowManager.setSkipTaskbar(true);
   }
 
   Future<void> quit() async {
