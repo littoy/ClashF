@@ -14,20 +14,21 @@ import 'package:flutter_macos_webview/flutter_macos_webview.dart';
 import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
 import 'package:http_server/http_server.dart';
-import 'package:flutter_archive/flutter_archive.dart';
 import 'package:localstorage/localstorage.dart';
+import 'package:system_tray/system_tray.dart';
 
-String getCoreDir(){
+String getCoreDir() {
   String mainPath = Platform.resolvedExecutable;
-  return join(File(mainPath).parent.path,'..','Frameworks','App.framework','Resources','flutter_assets','assets','core');
+  return join(File(mainPath).parent.path, '..', 'Frameworks', 'App.framework',
+      'Resources', 'flutter_assets', 'assets', 'core');
 }
 
-String getCoreExePath(){
+String getCoreExePath() {
   var clashEXE = 'clash';
-  if(Platform.isWindows){
-    clashEXE = clashEXE+'.exe';
+  if (Platform.isWindows) {
+    clashEXE = clashEXE + '.exe';
   }
-  return join(getCoreDir(),clashEXE);
+  return join(getCoreDir(), clashEXE);
 }
 
 void main() async {
@@ -43,7 +44,7 @@ void main() async {
     await windowManager.setSize(const Size(290, 460));
     // await windowManager.center();
     await windowManager.show();
-    await windowManager.setSkipTaskbar(false);
+    await windowManager.setSkipTaskbar(true);
   });
 
   final storage = new LocalStorage('mainconf.json');
@@ -51,14 +52,14 @@ void main() async {
   String? ver = await storage.getItem('ver');
   Directory directory = await getLibraryDirectory();
   var foler = join(directory.path, "clashCore");
-  
+
   var corePath = getCoreExePath();
 
-  print("package version:"+ ver!);
-  print("corePath:"+ corePath);
+  print("package version:" + ver!);
+  print("corePath:" + corePath);
 
   if (ver != packageVersion) {
-    try{
+    try {
       Directory(foler).createSync();
     } catch (e) {
       print(e);
@@ -93,7 +94,7 @@ void main() async {
     bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
     await File(join(foler, fileName)).writeAsBytes(bytes);
 
-    if(Platform.isWindows){
+    if (Platform.isWindows) {
       String fileName = 'win/start.cmd';
       data = await rootBundle.load("assets/core/" + fileName);
       bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
@@ -116,29 +117,26 @@ void main() async {
       await File(join(foler, fileName)).writeAsBytes(bytes);
     }
 
-    storage.setItem('ver',packageVersion);
-
+    storage.setItem('ver', packageVersion);
   }
-  startHttpServer(join(getCoreDir(),'public'));
+  startHttpServer(join(getCoreDir(), 'public'));
   runApp(const MyApp());
 }
 
-void startHttpServer(String webdir) async{
+void startHttpServer(String webdir) async {
   HttpServer.bind('127.0.0.1', 8571).then((HttpServer server) {
     VirtualDirectory vd = new VirtualDirectory(webdir);
     vd.jailRoot = false;
     server.listen((request) {
       // print("request.uri.path: " + request.uri.path);
       if (request.uri.path == '/services') {
-
       } else {
         // print('File request');
         vd.serveRequest(request);
-      } 
+      }
     });
   });
 }
-
 
 class MyApp extends StatelessWidget {
   const MyApp({Key? key}) : super(key: key);
@@ -192,6 +190,51 @@ class _MyHomePageState extends State<MyHomePage> {
   String _mode = '';
   var _channel;
   var icon = const Icon(Icons.play_circle);
+  final SystemTray _systemTray = SystemTray();
+  final AppWindow _appWindow = AppWindow();
+
+  Future<void> show() async {
+    await windowManager.show();
+    // await windowManager.setSkipTaskbar(false);
+  }
+  Future<void> hide() async {
+    await windowManager.hide();
+    // await windowManager.setSkipTaskbar(true);
+  }
+  Future<void> close() async {
+    await windowManager.close();
+  }
+
+  Future<void> initSystemTray() async {
+    String path =
+        Platform.isWindows ? 'assets/app_icon.ico' : 'assets/app_icon.png';
+
+    final menu = [
+      MenuItem(label: 'Show', onClicked: show),
+      MenuItem(label: 'Hide', onClicked: hide),
+      MenuItem(label: 'Exit', onClicked: close),
+    ];
+
+    // We first init the systray menu and then add the menu entries
+    await _systemTray.initSystemTray(
+      title: "",
+      iconPath: path,
+    );
+
+    await _systemTray.setContextMenu(menu);
+
+    // handle system tray event
+    _systemTray.registerSystemTrayEventHandler((eventName) {
+      debugPrint("eventName: $eventName");
+      if (eventName == "leftMouseDown") {
+      } else if (eventName == "leftMouseUp") {
+        _systemTray.popUpContextMenu();
+      } else if (eventName == "rightMouseDown") {
+      } else if (eventName == "rightMouseUp") {
+        _appWindow.show();
+      }
+    });
+  }
 
   void _connectws() async {
     WebSocket.connect("ws://127.0.0.1:9090/traffic?token=").then((ws) {
@@ -229,9 +272,11 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> _switch() async {
     Directory directory = await getLibraryDirectory();
     var clashWorkdir = join(directory.path, "clashCore");
-    var startCMD = '/bin/bash "' + getCoreDir()+ '/start.sh" "'+clashWorkdir+'"';
-    var stopCMD = '/bin/bash "' + getCoreDir() + '/stop.sh" "'+clashWorkdir+'"';
-    if(Platform.isWindows){
+    var startCMD =
+        '/bin/bash "' + getCoreDir() + '/start.sh" "' + clashWorkdir + '"';
+    var stopCMD =
+        '/bin/bash "' + getCoreDir() + '/stop.sh" "' + clashWorkdir + '"';
+    if (Platform.isWindows) {
       startCMD = getCoreDir() + "win\\start.cmd";
       stopCMD = getCoreDir() + "win\\stop.cmd";
     }
@@ -344,22 +389,19 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> _loadConfig() async {
     var uri = Uri.parse('http://127.0.0.1:9090/configs');
-    try{
-    var response = await http.get(
-      uri,
-      headers: {
+    try {
+      var response = await http.get(uri, headers: {
         'Content-Type': 'application/json',
-      }
-    );
-    if (response.statusCode == 200) {
-      // print(response.body);
-      Map config = jsonDecode(response.body);
-      setState(() {
-        _mode = config['mode'];
-        _tunmode = config['tun'];
       });
-    }
-    }catch(e){
+      if (response.statusCode == 200) {
+        // print(response.body);
+        Map config = jsonDecode(response.body);
+        setState(() {
+          _mode = config['mode'];
+          _tunmode = config['tun'];
+        });
+      }
+    } catch (e) {
       setState(() {
         _mode = '';
         _tunmode = false;
@@ -367,27 +409,27 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  Future<void> _patchConfig(String mode,String tun) async {
+  Future<void> _patchConfig(String mode, String tun) async {
     var uri = Uri.parse('http://127.0.0.1:9090/configs');
-    try{
-      var response = await http.patch(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: mode != '' ? '{"mode":"'+mode+'"}':'{"tun":{"enable":'+tun+'}}'
-      );
+    try {
+      var response = await http.patch(uri,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: mode != ''
+              ? '{"mode":"' + mode + '"}'
+              : '{"tun":{"enable":' + tun + '}}');
       if (response.statusCode == 204) {
         _loadConfig();
-      }else{
-        if(mode != ''){
-           setState(() {
+      } else {
+        if (mode != '') {
+          setState(() {
             _mode = '';
             _tunmode = false;
           });
         }
       }
-    }catch(e){
+    } catch (e) {
       setState(() {
         _mode = '';
         _tunmode = false;
@@ -400,6 +442,7 @@ class _MyHomePageState extends State<MyHomePage> {
     super.initState();
     _connectws();
     _loadConfig();
+    initSystemTray();
   }
 
   @override
@@ -470,7 +513,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       setState(() {
                         this._mode = 'rule';
                       });
-                      _patchConfig(this._mode,'');
+                      _patchConfig(this._mode, '');
                     }),
                 const Text("Rule"),
                 Radio(
@@ -480,7 +523,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       setState(() {
                         this._mode = 'global';
                       });
-                      _patchConfig(this._mode,'');
+                      _patchConfig(this._mode, '');
                     }),
                 const Text("Global"),
                 Radio(
@@ -490,7 +533,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       setState(() {
                         this._mode = 'direct';
                       });
-                      _patchConfig(this._mode,'');
+                      _patchConfig(this._mode, '');
                     }),
                 const Text("Direct"),
               ],
