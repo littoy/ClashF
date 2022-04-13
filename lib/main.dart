@@ -211,7 +211,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> updateSystemTrayMenu() async {
-    var runLabel = 'Stop';
+    var runLabel = 'Run';
     var tunLabel = 'TUN';
     var ruleLabel = 'rule';
     var globalLabel = 'global';
@@ -251,6 +251,9 @@ class _MyHomePageState extends State<MyHomePage> {
           ),
         ],
       ),
+      MenuItem(label: 'Dashboard', onClicked: (){
+        _onOpenDashboard(PresentationStyle.modal);
+      }),
       MenuItem(label: 'Hide', onClicked: hide),
       MenuSeparator(),
       MenuItem(label: 'Exit', onClicked: quit),
@@ -289,13 +292,16 @@ class _MyHomePageState extends State<MyHomePage> {
         _runState = 'Runing';
         _runing = true;
       });
+      _loadConfig();
+
       _channel = IOWebSocketChannel(ws);
       _channel.stream.listen((message) {
+        Map stat = jsonDecode(message);
+        _systemTray.setTitle(stat['count'].toString());
         setState(() {
           _speed = message.toString();
         });
       });
-      _loadConfig();
     }).catchError((onError) {
       if (_runState == 'Runing') {
         Future.delayed(const Duration(seconds: 2), () {
@@ -352,7 +358,6 @@ class _MyHomePageState extends State<MyHomePage> {
                   icon = const Icon(Icons.play_circle);
                 });
                 print('start error!');
-                print(onError);
               });
     } else {
       await run(stopCMD)
@@ -362,15 +367,16 @@ class _MyHomePageState extends State<MyHomePage> {
                   _result = result.outText;
                   icon = const Icon(Icons.play_circle);
                   _tunmode = false;
-                })
+                }),
+                _systemTray.setTitle(''),
+                _loadConfig()
               }).catchError((onError) {
                 print('stop error!');
-                print(onError);
               });
     }
   }
 
-  Future<void> _onOpenPressed(PresentationStyle presentationStyle) async {
+  Future<void> _onOpenDashboard(PresentationStyle presentationStyle) async {
     final webview = FlutterMacOSWebView(
       onOpen: () => print('Opened'),
       onClose: () => print('Closed'),
@@ -586,7 +592,7 @@ class _MyHomePageState extends State<MyHomePage> {
             ),
             CupertinoButton(
               child: Text('DashBoard'),
-              onPressed: () => _onOpenPressed(PresentationStyle.modal),
+              onPressed: () => _onOpenDashboard(PresentationStyle.modal),
             ),
             CupertinoButton(
               child: Text('ReloadConfig'),
