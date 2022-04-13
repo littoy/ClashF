@@ -44,7 +44,7 @@ void main() async {
     await windowManager.setSize(const Size(290, 460));
     await windowManager.center();
     await windowManager.hide();
-    // await windowManager.setSkipTaskbar(true);
+    await windowManager.setSkipTaskbar(true);
   });
 
   final storage = new LocalStorage('mainconf.json');
@@ -181,7 +181,7 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
+class _MyHomePageState extends State<MyHomePage> with WindowListener {
   bool _runing = false;
   String _runState = 'Stoped';
   bool _tunmode = false;
@@ -506,10 +506,17 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   void initState() {
+    windowManager.addListener(this);
     super.initState();
     _connectws();
     _loadConfig();
     initSystemTray();
+  }
+
+  @override
+  void onWindowClose() {
+    // do something
+    windowManager.setSkipTaskbar(true);
   }
 
   @override
