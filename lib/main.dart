@@ -239,15 +239,30 @@ class _MyHomePageState extends State<MyHomePage> {
         children: [
           MenuItem(
             label: (_mode == 'rule' ? '✔' : '') + ruleLabel,
-            onClicked: () {},
+            onClicked: () {
+              setState(() {
+                        this._mode = 'rule';
+              });
+              _patchConfig(this._mode, '');
+            },
           ),
           MenuItem(
             label: (_mode == 'direct' ? '✔' : '') + directLabel,
-            onClicked: () {},
+            onClicked: () {
+              setState(() {
+                        this._mode = 'direct';
+              });
+              _patchConfig(this._mode, '');
+            },
           ),
           MenuItem(
             label: (_mode == 'global' ? '✔' : '') + globalLabel,
-            onClicked: () {},
+            onClicked: () {
+              setState(() {
+                        this._mode = 'global';
+              });
+              _patchConfig(this._mode, '');
+            },
           ),
         ],
       ),
