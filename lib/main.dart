@@ -17,8 +17,21 @@ import 'package:http_server/http_server.dart';
 import 'package:flutter_archive/flutter_archive.dart';
 import 'package:localstorage/localstorage.dart';
 
+String getCoreDir(){
+  String mainPath = Platform.resolvedExecutable;
+  return join(File(mainPath).parent.path,'..','Frameworks','App.framework','Resources','flutter_assets','assets','core');
+}
+
+String getCoreExePath(){
+  var clashEXE = 'clash';
+  if(Platform.isWindows){
+    clashEXE = clashEXE+'.exe';
+  }
+  return join(getCoreDir(),clashEXE);
+}
+
 void main() async {
-  String packageVersion = '1.0';
+  String packageVersion = '1.1';
   WidgetsFlutterBinding.ensureInitialized();
   // Must add this line.
   await windowManager.ensureInitialized();
@@ -37,47 +50,42 @@ void main() async {
   await storage.ready;
   String? ver = await storage.getItem('ver');
   Directory directory = await getLibraryDirectory();
-  var clashEXE = 'clash';
-  if(Platform.isWindows){
-    clashEXE = clashEXE+'.exe';
-  }
-  var corePath = join(directory.path, "clashCore", clashEXE);
-  
   var foler = join(directory.path, "clashCore");
-  print("package version:"+ ver!);
-  if (!File(corePath).existsSync() || ver != packageVersion) {
-    Directory(foler).createSync();
-    ByteData data = await rootBundle.load("assets/core/${clashEXE}");
-    List<int> bytes =
-        data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-    await File(corePath).writeAsBytes(bytes);
+  
+  var corePath = getCoreExePath();
 
-    // data = await rootBundle.load("assets/core/config.yaml");
-    // bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-    // await File(join(foler, 'config.yaml')).writeAsBytes(bytes);
-    data = await rootBundle.load("assets/core/public.zip");
-    bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-    File zipFile = await File(join(foler, 'public.zip')).writeAsBytes(bytes);
-    final destinationDir = Directory(join(foler,'html'));
-    try {
-      ZipFile.extractToDirectory(zipFile: zipFile, destinationDir: destinationDir);
+  print("package version:"+ ver!);
+  print("corePath:"+ corePath);
+
+  if (ver != packageVersion) {
+    try{
+      Directory(foler).createSync();
     } catch (e) {
       print(e);
     }
+    //Dash board html
+    // var data = await rootBundle.load("assets/core/public.zip");
+    // var bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+    // File zipFile = await File(join(foler, 'public.zip')).writeAsBytes(bytes);
+    // final destinationDir = Directory(join(foler,'html'));
+    // try {
+    //   ZipFile.extractToDirectory(zipFile: zipFile, destinationDir: destinationDir);
+    // } catch (e) {
+    //   print(e);
+    // }
+    // String fileName = 'start.sh';
+    // data = await rootBundle.load("assets/core/" + fileName);
+    // bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+    // await File(join(foler, fileName)).writeAsBytes(bytes);
 
-    String fileName = 'start.sh';
-    data = await rootBundle.load("assets/core/" + fileName);
-    bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-    await File(join(foler, fileName)).writeAsBytes(bytes);
+    // fileName = 'stop.sh';
+    // data = await rootBundle.load("assets/core/" + fileName);
+    // bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+    // await File(join(foler, fileName)).writeAsBytes(bytes);
 
-    fileName = 'stop.sh';
-    data = await rootBundle.load("assets/core/" + fileName);
-    bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-    await File(join(foler, fileName)).writeAsBytes(bytes);
-
-    fileName = 'Country.mmdb';
-    data = await rootBundle.load("assets/core/" + fileName);
-    bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+    var fileName = 'Country.mmdb';
+    var data = await rootBundle.load("assets/core/" + fileName);
+    var bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
     await File(join(foler, fileName)).writeAsBytes(bytes);
 
     fileName = 'geosite.dat';
@@ -109,10 +117,9 @@ void main() async {
     }
 
     storage.setItem('ver',packageVersion);
-    print('copy to corePath');
-    print(corePath);
+
   }
-  startHttpServer(join(foler,'html','public'));
+  startHttpServer(join(getCoreDir(),'public'));
   runApp(const MyApp());
 }
 
@@ -120,7 +127,7 @@ void startHttpServer(String webdir) async{
   HttpServer.bind('127.0.0.1', 8571).then((HttpServer server) {
     VirtualDirectory vd = new VirtualDirectory(webdir);
     vd.jailRoot = false;
-    server.listen((request) { 
+    server.listen((request) {
       // print("request.uri.path: " + request.uri.path);
       if (request.uri.path == '/services') {
 
@@ -221,12 +228,12 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> _switch() async {
     Directory directory = await getLibraryDirectory();
-    var folder = join(directory.path, "clashCore");
-    var startCMD = '/bin/bash ' + folder + '/start.sh';
-    var stopCMD = '/bin/bash ' + folder + '/stop.sh';
+    var clashWorkdir = join(directory.path, "clashCore");
+    var startCMD = '/bin/bash "' + getCoreDir()+ '/start.sh" "'+clashWorkdir+'"';
+    var stopCMD = '/bin/bash "' + getCoreDir() + '/stop.sh" "'+clashWorkdir+'"';
     if(Platform.isWindows){
-      startCMD = folder + '/start.cmd';
-      stopCMD = folder + '/stop.cmd';
+      startCMD = getCoreDir() + "win\\start.cmd";
+      stopCMD = getCoreDir() + "win\\stop.cmd";
     }
     _counter++;
     setState(() {
