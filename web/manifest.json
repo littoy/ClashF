@@ -1,6 +1,6 @@
 {
-    "name": "clashgui",
-    "short_name": "clashgui",
+    "name": "ClashF",
+    "short_name": "ClashF",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

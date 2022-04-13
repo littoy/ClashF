@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.14)
-project(clashgui LANGUAGES CXX)
+project(ClashF LANGUAGES CXX)
 
-set(BINARY_NAME "clashgui")
+set(BINARY_NAME "ClashF")
 
 cmake_policy(SET CMP0063 NEW)
 

@@ -13,8 +13,12 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_macos_webview/flutter_macos_webview.dart';
 import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
+import 'package:http_server/http_server.dart';
+import 'package:flutter_archive/flutter_archive.dart';
+import 'package:localstorage/localstorage.dart';
 
 void main() async {
+  String packageVersion = '1.0';
   WidgetsFlutterBinding.ensureInitialized();
   // Must add this line.
   await windowManager.ensureInitialized();
@@ -29,19 +33,37 @@ void main() async {
     await windowManager.setSkipTaskbar(false);
   });
 
+  final storage = new LocalStorage('mainconf.json');
+  await storage.ready;
+  String? ver = await storage.getItem('ver');
   Directory directory = await getLibraryDirectory();
-  var corePath = join(directory.path, "clashCore", "clash");
+  var clashEXE = 'clash';
+  if(Platform.isWindows){
+    clashEXE = clashEXE+'.exe';
+  }
+  var corePath = join(directory.path, "clashCore", clashEXE);
+  
   var foler = join(directory.path, "clashCore");
-  if (!File(corePath).existsSync()) {
+  print("package version:"+ ver!);
+  if (!File(corePath).existsSync() || ver != packageVersion) {
     Directory(foler).createSync();
-    ByteData data = await rootBundle.load("assets/core/clash");
+    ByteData data = await rootBundle.load("assets/core/${clashEXE}");
     List<int> bytes =
         data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
     await File(corePath).writeAsBytes(bytes);
 
-    data = await rootBundle.load("assets/core/config.yaml");
+    // data = await rootBundle.load("assets/core/config.yaml");
+    // bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+    // await File(join(foler, 'config.yaml')).writeAsBytes(bytes);
+    data = await rootBundle.load("assets/core/public.zip");
     bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-    await File(join(foler, 'config.yaml')).writeAsBytes(bytes);
+    File zipFile = await File(join(foler, 'public.zip')).writeAsBytes(bytes);
+    final destinationDir = Directory(join(foler,'html'));
+    try {
+      ZipFile.extractToDirectory(zipFile: zipFile, destinationDir: destinationDir);
+    } catch (e) {
+      print(e);
+    }
 
     String fileName = 'start.sh';
     data = await rootBundle.load("assets/core/" + fileName);
@@ -63,12 +85,53 @@ void main() async {
     bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
     await File(join(foler, fileName)).writeAsBytes(bytes);
 
+    if(Platform.isWindows){
+      String fileName = 'win/start.cmd';
+      data = await rootBundle.load("assets/core/" + fileName);
+      bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+      await File(join(foler, fileName)).writeAsBytes(bytes);
+      fileName = 'win/stop.cmd';
+      data = await rootBundle.load("assets/core/" + fileName);
+      bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+      await File(join(foler, fileName)).writeAsBytes(bytes);
+      fileName = 'win/winsw.exe';
+      data = await rootBundle.load("assets/core/" + fileName);
+      bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+      await File(join(foler, fileName)).writeAsBytes(bytes);
+      fileName = 'win/winsw.xml';
+      data = await rootBundle.load("assets/core/" + fileName);
+      bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+      await File(join(foler, fileName)).writeAsBytes(bytes);
+      fileName = 'win/wintun.dll';
+      data = await rootBundle.load("assets/core/" + fileName);
+      bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+      await File(join(foler, fileName)).writeAsBytes(bytes);
+    }
+
+    storage.setItem('ver',packageVersion);
     print('copy to corePath');
     print(corePath);
   }
-
+  startHttpServer(join(foler,'html','public'));
   runApp(const MyApp());
 }
+
+void startHttpServer(String webdir) async{
+  HttpServer.bind('127.0.0.1', 8571).then((HttpServer server) {
+    VirtualDirectory vd = new VirtualDirectory(webdir);
+    vd.jailRoot = false;
+    server.listen((request) { 
+      // print("request.uri.path: " + request.uri.path);
+      if (request.uri.path == '/services') {
+
+      } else {
+        // print('File request');
+        vd.serveRequest(request);
+      } 
+    });
+  });
+}
+
 
 class MyApp extends StatelessWidget {
   const MyApp({Key? key}) : super(key: key);
@@ -119,7 +182,7 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _tunmode = false;
   String _result = '';
   String _speed = '';
-  String _part = '';
+  String _mode = '';
   var _channel;
   var icon = const Icon(Icons.play_circle);
 
@@ -139,6 +202,7 @@ class _MyHomePageState extends State<MyHomePage> {
           _speed = message.toString();
         });
       });
+      _loadConfig();
     }).catchError((onError) {
       if (_runState == 'Runing') {
         Future.delayed(const Duration(seconds: 2), () {
@@ -155,9 +219,15 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-  Future<void> _incrementCounter() async {
+  Future<void> _switch() async {
     Directory directory = await getLibraryDirectory();
     var folder = join(directory.path, "clashCore");
+    var startCMD = '/bin/bash ' + folder + '/start.sh';
+    var stopCMD = '/bin/bash ' + folder + '/stop.sh';
+    if(Platform.isWindows){
+      startCMD = folder + '/start.cmd';
+      stopCMD = folder + '/stop.cmd';
+    }
     _counter++;
     setState(() {
       // This call to setState tells the Flutter framework that something has
@@ -168,7 +238,7 @@ class _MyHomePageState extends State<MyHomePage> {
       _runState = (_counter % 2 == 0) ? 'Stoped' : 'Runing';
     });
     if (_runState == 'Runing') {
-      run('/bin/bash ' + folder + '/start.sh')
+      run(startCMD)
           .then((result) => {
                 Future.delayed(const Duration(seconds: 1), () {
                   _connectws();
@@ -183,12 +253,13 @@ class _MyHomePageState extends State<MyHomePage> {
         print(onError);
       });
     } else {
-      run('/bin/bash ' + folder + '/stop.sh')
+      run(stopCMD)
           .then((result) => {
                 // _closews(),
                 setState(() {
                   _result = result.outText;
                   icon = const Icon(Icons.play_circle);
+                  _tunmode = false;
                 })
               })
           .catchError((onError) {
@@ -216,7 +287,7 @@ class _MyHomePageState extends State<MyHomePage> {
     );
 
     await webview.open(
-      url: 'http://yacd.apphaodian.com:28039/99/xljksdjferwr011XyPs/yacd/#/proxies',
+      url: 'http://127.0.0.1:8571/index.html#/proxies',
       presentationStyle: presentationStyle,
       size: Size(860.0, 600.0),
       modalTitle: 'DashBoard',
@@ -246,6 +317,7 @@ class _MyHomePageState extends State<MyHomePage> {
         _speed = 'Failed';
       });
     }
+    _loadConfig();
   }
 
   Future<void> _onChooseConfig() async {
@@ -257,6 +329,7 @@ class _MyHomePageState extends State<MyHomePage> {
       var foler = join(directory.path, "clashCore");
       File file = File(filePath!);
       await file.copy(join(foler, 'config.yaml'));
+      await _onReloadConfigPressed();
     } else {
       // User canceled the picker
     }
@@ -264,6 +337,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> _loadConfig() async {
     var uri = Uri.parse('http://127.0.0.1:9090/configs');
+    try{
     var response = await http.get(
       uri,
       headers: {
@@ -274,22 +348,43 @@ class _MyHomePageState extends State<MyHomePage> {
       // print(response.body);
       Map config = jsonDecode(response.body);
       setState(() {
-        _part = config['mode'];
+        _mode = config['mode'];
         _tunmode = config['tun'];
+      });
+    }
+    }catch(e){
+      setState(() {
+        _mode = '';
+        _tunmode = false;
       });
     }
   }
 
   Future<void> _patchConfig(String mode,String tun) async {
     var uri = Uri.parse('http://127.0.0.1:9090/configs');
-    var response = await http.patch(
-      uri,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: mode != '' ? '{"mode":"'+mode+'"}':'{"tun":'+tun+'}'
-    );
-    if (response.statusCode == 204) {
+    try{
+      var response = await http.patch(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: mode != '' ? '{"mode":"'+mode+'"}':'{"tun":{"enable":'+tun+'}}'
+      );
+      if (response.statusCode == 204) {
+        _loadConfig();
+      }else{
+        if(mode != ''){
+           setState(() {
+            _mode = '';
+            _tunmode = false;
+          });
+        }
+      }
+    }catch(e){
+      setState(() {
+        _mode = '';
+        _tunmode = false;
+      });
     }
   }
 
@@ -303,7 +398,7 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
+    // by the _switch method above.
     //
     // The Flutter framework has been optimized to make rerunning build methods
     // fast, so that you can just rebuild anything that needs updating rather
@@ -363,32 +458,32 @@ class _MyHomePageState extends State<MyHomePage> {
                 // Text("Model"),
                 Radio(
                     value: 'rule',
-                    groupValue: _part,
+                    groupValue: _mode,
                     onChanged: (value) {
                       setState(() {
-                        this._part = 'rule';
+                        this._mode = 'rule';
                       });
-                      _patchConfig(this._part,'');
+                      _patchConfig(this._mode,'');
                     }),
                 const Text("Rule"),
                 Radio(
                     value: 'global',
-                    groupValue: _part,
+                    groupValue: _mode,
                     onChanged: (value) {
                       setState(() {
-                        this._part = 'global';
+                        this._mode = 'global';
                       });
-                      _patchConfig(this._part,'');
+                      _patchConfig(this._mode,'');
                     }),
                 const Text("Global"),
                 Radio(
                     value: 'direct',
-                    groupValue: _part,
+                    groupValue: _mode,
                     onChanged: (value) {
                       setState(() {
-                        this._part = 'direct';
+                        this._mode = 'direct';
                       });
-                      _patchConfig(this._part,'');
+                      _patchConfig(this._mode,'');
                     }),
                 const Text("Direct"),
               ],
@@ -409,8 +504,8 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
+        onPressed: _switch,
+        tooltip: 'Start or Stop',
         child: icon,
       ), // This trailing comma makes auto-formatting nicer for build methods.
     );

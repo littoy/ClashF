@@ -1,4 +1,4 @@
-name: clashgui
+name: ClashF
 description: A new Flutter project.
 
 # The following line prevents the package from being accidentally published to
@@ -41,6 +41,9 @@ dependencies:
   flutter_macos_webview: ^0.0.6
   http: ^0.13.4
   file_picker: ^4.5.1
+  http_server: ^1.0.0
+  flutter_archive: ^4.2.0
+  localstorage: ^4.0.0+1
 
 dev_dependencies:
   flutter_test:

@@ -1,0 +1,9 @@
+<configuration>
+  <id>ClashTun</id>
+  <name>Clash with tun</name>
+  <description>Clash tun Service</description>
+  <executable>clash.exe</executable>
+  <arguments>-d "%BASE%"</arguments>
+  <startmode>Manual</startmode>
+  <log mode="reset"></log>
+</configuration>
