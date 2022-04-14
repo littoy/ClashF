@@ -20,14 +20,19 @@ import 'package:system_tray/system_tray.dart';
 
 String getCoreDir() {
   String mainPath = Platform.resolvedExecutable;
-  return join(File(mainPath).parent.path, '..', 'Frameworks', 'App.framework',
-      'Resources', 'flutter_assets', 'assets', 'core');
+  if (Platform.isWindows) {
+    return join(
+        File(mainPath).parent.path, 'data', 'flutter_assets', 'assets', 'core');
+  } else {
+    return join(File(mainPath).parent.path, '..', 'Frameworks', 'App.framework',
+        'Resources', 'flutter_assets', 'assets', 'core');
+  }
 }
 
 String getCoreExePath() {
   var clashEXE = 'clash';
   if (Platform.isWindows) {
-    clashEXE = clashEXE + '.exe';
+    clashEXE = join('win', clashEXE + '.exe');
   }
   return join(getCoreDir(), clashEXE);
 }
@@ -41,17 +46,19 @@ void main() async {
   // Use it only after calling `hiddenWindowAtLaunch`
   windowManager.waitUntilReadyToShow().then((_) async {
     // Hide window title bar
-    await windowManager.setTitleBarStyle('hidden');
+    if (Platform.isMacOS) await windowManager.setTitleBarStyle('hidden');
     await windowManager.setSize(const Size(290, 460));
     await windowManager.center();
     await windowManager.hide();
     await windowManager.setSkipTaskbar(true);
   });
 
-  final storage = new LocalStorage('mainconf.json');
+  final storage = LocalStorage('mainconf');
   await storage.ready;
   String? ver = await storage.getItem('ver');
-  Directory directory = await getLibraryDirectory();
+  Directory directory = Platform.isIOS || Platform.isMacOS
+      ? await getLibraryDirectory()
+      : await getApplicationDocumentsDirectory();
   var foler = join(directory.path, "clashCore");
 
   var corePath = getCoreExePath();
@@ -65,25 +72,6 @@ void main() async {
     } catch (e) {
       print(e);
     }
-    //Dash board html
-    // var data = await rootBundle.load("assets/core/public.zip");
-    // var bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-    // File zipFile = await File(join(foler, 'public.zip')).writeAsBytes(bytes);
-    // final destinationDir = Directory(join(foler,'html'));
-    // try {
-    //   ZipFile.extractToDirectory(zipFile: zipFile, destinationDir: destinationDir);
-    // } catch (e) {
-    //   print(e);
-    // }
-    // String fileName = 'start.sh';
-    // data = await rootBundle.load("assets/core/" + fileName);
-    // bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-    // await File(join(foler, fileName)).writeAsBytes(bytes);
-
-    // fileName = 'stop.sh';
-    // data = await rootBundle.load("assets/core/" + fileName);
-    // bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-    // await File(join(foler, fileName)).writeAsBytes(bytes);
 
     var fileName = 'Country.mmdb';
     var data = await rootBundle.load("assets/core/" + fileName);
@@ -95,28 +83,7 @@ void main() async {
     bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
     await File(join(foler, fileName)).writeAsBytes(bytes);
 
-    if (Platform.isWindows) {
-      String fileName = 'win/start.cmd';
-      data = await rootBundle.load("assets/core/" + fileName);
-      bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-      await File(join(foler, fileName)).writeAsBytes(bytes);
-      fileName = 'win/stop.cmd';
-      data = await rootBundle.load("assets/core/" + fileName);
-      bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-      await File(join(foler, fileName)).writeAsBytes(bytes);
-      fileName = 'win/winsw.exe';
-      data = await rootBundle.load("assets/core/" + fileName);
-      bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-      await File(join(foler, fileName)).writeAsBytes(bytes);
-      fileName = 'win/winsw.xml';
-      data = await rootBundle.load("assets/core/" + fileName);
-      bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-      await File(join(foler, fileName)).writeAsBytes(bytes);
-      fileName = 'win/wintun.dll';
-      data = await rootBundle.load("assets/core/" + fileName);
-      bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-      await File(join(foler, fileName)).writeAsBytes(bytes);
-    }
+    if (Platform.isWindows) {}
 
     storage.setItem('ver', packageVersion);
   }
@@ -186,7 +153,6 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
   bool _runing = false;
   String _runState = 'Stoped';
   bool _tunmode = false;
-  String _result = '';
   String _speed = '';
   String _mode = '';
   var _channel;
@@ -246,7 +212,7 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
             label: (_mode == 'rule' ? '✔' : '') + ruleLabel,
             onClicked: () {
               setState(() {
-                        this._mode = 'rule';
+                this._mode = 'rule';
               });
               _patchConfig(this._mode, '');
             },
@@ -255,7 +221,7 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
             label: (_mode == 'direct' ? '✔' : '') + directLabel,
             onClicked: () {
               setState(() {
-                        this._mode = 'direct';
+                this._mode = 'direct';
               });
               _patchConfig(this._mode, '');
             },
@@ -264,16 +230,18 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
             label: (_mode == 'global' ? '✔' : '') + globalLabel,
             onClicked: () {
               setState(() {
-                        this._mode = 'global';
+                this._mode = 'global';
               });
               _patchConfig(this._mode, '');
             },
           ),
         ],
       ),
-      MenuItem(label: 'Dashboard', onClicked: (){
-        _onOpenDashboard(PresentationStyle.sheet);
-      }),
+      MenuItem(
+          label: 'Dashboard',
+          onClicked: () {
+            _onOpenDashboard(PresentationStyle.sheet);
+          }),
       MenuItem(label: 'Hide', onClicked: hide),
       MenuSeparator(),
       MenuItem(label: 'Exit', onClicked: quit),
@@ -369,17 +337,18 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
                   _result = result.outText;
                   icon = const Icon(Icons.stop_circle);
                 })
-              }).catchError((onError) {
-                Future.delayed(const Duration(seconds: 1), () {
-                  _connectws();
-                });
-                setState(() {
-                  _result = '';
-                  _runing = false;
-                  icon = const Icon(Icons.play_circle);
-                });
-                print('start error!');
-              });
+              })
+          .catchError((onError) {
+        Future.delayed(const Duration(seconds: 1), () {
+          _connectws();
+        });
+        setState(() {
+          _result = '';
+          _runing = false;
+          icon = const Icon(Icons.play_circle);
+        });
+        print('start error!');
+      });
     } else {
       await run(stopCMD)
           .then((result) => {
@@ -391,9 +360,10 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
                 }),
                 _systemTray.setTitle(''),
                 _loadConfig()
-              }).catchError((onError) {
-                print('stop error!');
-              });
+              })
+          .catchError((onError) {
+        print('stop error!');
+      });
     }
   }
 
@@ -413,7 +383,7 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
     await webview.open(
       url: 'http://127.0.0.1:8571/index.html#/proxies',
       presentationStyle: presentationStyle,
-      size: Size( width > 1280 ? 1200.0:860.0, 600.0),
+      size: Size(width > 1280 ? 1200.0 : 860.0, 600.0),
       modalTitle: 'DashBoard',
       userAgent:
           'Mozilla/5.0 (iPhone; CPU iPhone OS 14_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1',
