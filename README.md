@@ -4,12 +4,12 @@ A new Flutter project.
 
 ## Getting Started
 
-#run
+## run
 flutter run -d macos
 
-#build
+## build
 flutter build macos
 open macos/Runner.xcworkspace
 
-#core
+## core
 core from: https://github.com/yaling888/clash
