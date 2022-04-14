@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -204,6 +205,10 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
   }
 
   Future<void> quit() async {
+    await windowManager.destroy();
+  }
+
+  Future<void> stopAndQuit() async {
     if (_runing) {
       await _switch();
     }
@@ -267,11 +272,12 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
         ],
       ),
       MenuItem(label: 'Dashboard', onClicked: (){
-        _onOpenDashboard(PresentationStyle.modal);
+        _onOpenDashboard(PresentationStyle.sheet);
       }),
       MenuItem(label: 'Hide', onClicked: hide),
       MenuSeparator(),
       MenuItem(label: 'Exit', onClicked: quit),
+      MenuItem(label: 'Stop&Exit', onClicked: stopAndQuit),
     ];
     await _systemTray.setContextMenu(menu);
   }
@@ -403,11 +409,11 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
         );
       },
     );
-
+    final width = window.physicalSize.width;
     await webview.open(
       url: 'http://127.0.0.1:8571/index.html#/proxies',
       presentationStyle: presentationStyle,
-      size: Size(860.0, 600.0),
+      size: Size( width > 1280 ? 1200.0:860.0, 600.0),
       modalTitle: 'DashBoard',
       userAgent:
           'Mozilla/5.0 (iPhone; CPU iPhone OS 14_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1',
