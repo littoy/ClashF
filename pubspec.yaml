@@ -45,6 +45,8 @@ dependencies:
   flutter_archive: ^4.2.0
   localstorage: ^4.0.0+1
   system_tray: ^0.1.0
+  url_launcher: ^6.0.20
+  settings_yaml: ^3.4.0
 
 dev_dependencies:
   flutter_test:

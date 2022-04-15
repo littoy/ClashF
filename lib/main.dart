@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:ui';
+
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -17,6 +18,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:http_server/http_server.dart';
 import 'package:localstorage/localstorage.dart';
 import 'package:system_tray/system_tray.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 String getCoreDir() {
   String mainPath = Platform.resolvedExecutable;
@@ -63,7 +65,7 @@ void main() async {
 
   var corePath = getCoreExePath();
 
-  print("package version:" + ver!);
+  if(ver!=null) print("package version:" + ver);
   print("corePath:" + corePath);
 
   if (ver != packageVersion) {
@@ -93,7 +95,7 @@ void main() async {
 
 void startHttpServer(String webdir) async {
   HttpServer.bind('127.0.0.1', 8571).then((HttpServer server) {
-    VirtualDirectory vd = new VirtualDirectory(webdir);
+    VirtualDirectory vd = VirtualDirectory(webdir);
     vd.jailRoot = false;
     server.listen((request) {
       // print("request.uri.path: " + request.uri.path);
@@ -334,7 +336,6 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
                   _connectws();
                 }),
                 setState(() {
-                  _result = result.outText;
                   icon = const Icon(Icons.stop_circle);
                 })
               })
@@ -343,7 +344,6 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
           _connectws();
         });
         setState(() {
-          _result = '';
           _runing = false;
           icon = const Icon(Icons.play_circle);
         });
@@ -354,7 +354,6 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
           .then((result) => {
                 // _closews(),
                 setState(() {
-                  _result = result.outText;
                   icon = const Icon(Icons.play_circle);
                   _tunmode = false;
                 }),
@@ -368,29 +367,37 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
   }
 
   Future<void> _onOpenDashboard(PresentationStyle presentationStyle) async {
-    final webview = FlutterMacOSWebView(
-      onOpen: () => print('Opened'),
-      onClose: () => print('Closed'),
-      onPageStarted: (url) => print('Page started: $url'),
-      onPageFinished: (url) => print('Page finished: $url'),
-      onWebResourceError: (err) {
-        print(
-          'Error: ${err.errorCode}, ${err.errorType}, ${err.domain}, ${err.description}',
-        );
-      },
-    );
-    final width = window.physicalSize.width;
-    await webview.open(
-      url: 'http://127.0.0.1:8571/index.html#/proxies',
-      presentationStyle: presentationStyle,
-      size: Size(width > 1280 ? 1200.0 : 860.0, 600.0),
-      modalTitle: 'DashBoard',
-      userAgent:
-          'Mozilla/5.0 (iPhone; CPU iPhone OS 14_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1',
-    );
-
-    // await Future.delayed(Duration(seconds: 5));
-    // await webview.close();
+    const url = 'http://127.0.0.1:8571/index.html#/proxies';
+    if(Platform.isMacOS){
+      final webview = FlutterMacOSWebView(
+        onOpen: () => print('Opened'),
+        onClose: () => print('Closed'),
+        onPageStarted: (url) => print('Page started: $url'),
+        onPageFinished: (url) => print('Page finished: $url'),
+        onWebResourceError: (err) {
+          print(
+            'Error: ${err.errorCode}, ${err.errorType}, ${err.domain}, ${err.description}',
+          );
+        },
+      );
+      final width = window.physicalSize.width;
+      await webview.open(
+        url: url,
+        presentationStyle: presentationStyle,
+        size: Size(width > 1280 ? 1200.0 : 860.0, 600.0),
+        modalTitle: 'DashBoard',
+        userAgent:
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 14_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1',
+      );
+      // await Future.delayed(Duration(seconds: 5));
+      // await webview.close();
+    }else{
+      if (await canLaunch(url))
+        await launch(url);
+      else 
+        // can't launch url, there is some error
+        throw "Could not launch $url";
+    }
   }
 
   Future<void> _onReloadConfigPressed() async {
@@ -422,8 +429,38 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
       Directory directory = await getLibraryDirectory();
       var foler = join(directory.path, "clashCore");
       File file = File(filePath!);
-      await file.copy(join(foler, 'config.yaml'));
-      await _onReloadConfigPressed();
+      if(file.existsSync()){
+        try{
+          var config = file.readAsStringSync(encoding: Utf8Codec(allowMalformed: true));
+          RegExp rx = RegExp(r'external-controller:\s+:(\d+)');
+          var match = rx.firstMatch(config);
+          if (match != null) {
+              print(match.group(1));
+              var port = match.group(1);
+              if(port != '9090'){
+                var destConfig = config.replaceAll(RegExp(r'external-controller:\s+:(\d+)'), 'external-controller: :9090');
+                await File(join(foler, 'config.yaml')).writeAsString(config.toString());
+              }else{
+                file.copy(join(foler, 'config.yaml'));
+              }
+          }else{
+            file.copy(join(foler, 'config.yaml'));
+          }
+
+          // config['external-controller'] = ctrPort;
+          // var tun = new Map();
+          // tun['enable'] = false;
+          // tun['stack'] = 'system';
+          // tun['auto-route'] = true;
+          // tun['dns-hijack'] = ['0.0.0.0:53'];
+          // config['tun'] = tun;
+          // print(config.toString());
+        }catch(e){
+          print(e);
+          await file.copy(join(foler, 'config.yaml'));
+        }
+        await _onReloadConfigPressed();
+      }
     } else {
       // User canceled the picker
     }
@@ -452,8 +489,15 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
     updateSystemTrayMenu();
   }
 
-  Future<void> _patchConfig(String mode, String tun) async {
+  Future<void> _patchConfig(String mode, String openTun) async {
     var uri = Uri.parse('http://127.0.0.1:9090/configs');
+    var tun = <String, dynamic>{};
+    if(openTun != ''){
+      tun['enable'] = openTun == 'false' ? false : true;
+      tun['stack'] = 'system';
+      tun['auto-route'] = true;
+      tun['dns-hijack'] = ['0.0.0.0:53'];
+    }
     try {
       var response = await http.patch(uri,
           headers: {
@@ -461,10 +505,13 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
           },
           body: mode != ''
               ? '{"mode":"' + mode + '"}'
-              : '{"tun":{"enable":' + tun + '}}');
+              : '{"tun":'+jsonEncode(tun)+'}');
       if (response.statusCode == 204) {
         _loadConfig();
       } else {
+        print('{"tun":'+jsonEncode(tun));
+        print(response.statusCode);
+        print(utf8.decode(response.bodyBytes));
         if (mode != '') {
           setState(() {
             _mode = '';
@@ -473,6 +520,7 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
         }
       }
     } catch (e) {
+      print(e);
       setState(() {
         _mode = '';
         _tunmode = false;
