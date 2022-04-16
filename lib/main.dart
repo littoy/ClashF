@@ -402,23 +402,27 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
 
   Future<void> _onReloadConfigPressed() async {
     var uri = Uri.parse('http://127.0.0.1:9090/configs');
-    var response = await http.put(
-      uri,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: "{}",
-    );
-    if (response.statusCode == 204) {
-      setState(() {
-        _speed = 'reloaded';
-      });
-    } else {
-      setState(() {
-        _speed = 'Failed';
-      });
+    try{
+      var response = await http.put(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: "{}",
+      );
+      if (response.statusCode == 204) {
+        setState(() {
+          _speed = 'reloaded';
+        });
+      } else {
+        setState(() {
+          _speed = 'Failed';
+        });
+      }
+      _loadConfig();
+    }catch(e){
+      
     }
-    _loadConfig();
   }
 
   Future<void> _onChooseConfig() async {
