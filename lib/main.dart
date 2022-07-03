@@ -49,7 +49,7 @@ void gShowToast(String msg) {
     scaffold.showSnackBar(
       SnackBar(
         content: Text(msg),
-        action: SnackBarAction(label: 'Clash', onPressed: scaffold.hideCurrentSnackBar),
+        action: SnackBarAction(label: 'Dismiss', onPressed: scaffold.hideCurrentSnackBar),
       ),
     );
   }
