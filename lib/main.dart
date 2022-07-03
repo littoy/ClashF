@@ -462,6 +462,7 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
         });
       }
       _loadConfig();
+      gShowToast("Config reload success.");
     }catch(e){
       gShowToast("Load config error: $e");
     }
@@ -494,6 +495,7 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
           }else{
             file.copy(join(foler, 'config.yaml'));
           }
+          gShowToast("Update success.");
 
           // config['external-controller'] = ctrPort;
           // var tun = new Map();
@@ -504,10 +506,14 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
           // config['tun'] = tun;
           // print(config.toString());
         }catch(e){
-          gShowToast("Load config error: $e");
+          gShowToast("Parse config error: $e,just copy");
           await file.copy(join(foler, 'config.yaml'));
         }
-        await _onReloadConfigPressed();
+        if (_runState == 'Runing') {
+          await _onReloadConfigPressed();
+        }
+      }else{
+        gShowToast("File not found.");
       }
     } else {
       // User canceled the picker
