@@ -32,9 +32,9 @@ String getCoreDir() {
 }
 
 String getCoreExePath() {
-  var clashEXE = 'clash';
+  var clashEXE = 'clash-macos';
   if (Platform.isWindows) {
-    clashEXE = join('win', clashEXE + '.exe');
+    clashEXE = join('win', 'clash.exe');
   }
   return join(getCoreDir(), clashEXE);
 }
@@ -275,6 +275,17 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
     });
   }
 
+  String getBWHumanString(int BytePerSeconds){
+    if(BytePerSeconds > 1024*1024*1024){
+      return "${BytePerSeconds/1024/1024~/1024}G";
+    }else if(BytePerSeconds > 1024*1024){
+      return "${BytePerSeconds/1024~/1024}M";  
+    }else if(BytePerSeconds > 1024){
+      return "${BytePerSeconds~/1024}K";  
+    }
+    return "$BytePerSeconds";
+  }
+
   void _connectws() async {
     WebSocket.connect("ws://127.0.0.1:9090/traffic?token=").then((ws) {
       // create the stream channel
@@ -288,7 +299,11 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
       _channel = IOWebSocketChannel(ws);
       _channel.stream.listen((message) {
         Map stat = jsonDecode(message);
-        _systemTray.setTitle(stat['count'].toString());
+        var up = stat['up'];
+        var down = stat['down'];
+        var total = up + down;
+
+        _systemTray.setTitle(getBWHumanString(total));
         setState(() {
           _speed = message.toString();
         });
@@ -481,7 +496,7 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
         Map config = jsonDecode(response.body);
         setState(() {
           _mode = config['mode'];
-          _tunmode = config['tun'];
+          _tunmode = config['tun']['enable'];
         });
       }
     } catch (e) {
