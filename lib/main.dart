@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:process_run/shell_run.dart';
@@ -17,7 +18,7 @@ import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
 import 'package:http_server/http_server.dart';
 import 'package:localstorage/localstorage.dart';
-import 'package:system_tray/system_tray.dart';
+import 'package:system_tray/system_tray.dart' as system_tray;
 import 'package:url_launcher/url_launcher.dart';
 
 String getCoreDir() {
@@ -48,7 +49,7 @@ void main() async {
   // Use it only after calling `hiddenWindowAtLaunch`
   windowManager.waitUntilReadyToShow().then((_) async {
     // Hide window title bar
-    if (Platform.isMacOS) await windowManager.setTitleBarStyle('hidden');
+    if (Platform.isMacOS) await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
     await windowManager.setSize(const Size(290, 460));
     await windowManager.center();
     await windowManager.hide();
@@ -65,23 +66,31 @@ void main() async {
 
   var corePath = getCoreExePath();
 
-  if(ver!=null) print("package version:" + ver);
-  print("corePath:" + corePath);
+  if(ver!=null){
+    if (kDebugMode) {
+      print("package version:$ver");
+    }
+  }
+  if (kDebugMode) {
+    print("corePath:$corePath");
+  }
 
   if (ver != packageVersion) {
     try {
       Directory(foler).createSync();
     } catch (e) {
-      print(e);
+      if (kDebugMode) {
+        print(e);
+      }
     }
 
     var fileName = 'Country.mmdb';
-    var data = await rootBundle.load("assets/core/" + fileName);
+    var data = await rootBundle.load("assets/core/$fileName");
     var bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
     await File(join(foler, fileName)).writeAsBytes(bytes);
 
     fileName = 'geosite.dat';
-    data = await rootBundle.load("assets/core/" + fileName);
+    data = await rootBundle.load("assets/core/$fileName");
     bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
     await File(join(foler, fileName)).writeAsBytes(bytes);
 
@@ -159,8 +168,8 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
   String _mode = '';
   var _channel;
   var icon = const Icon(Icons.play_circle);
-  final SystemTray _systemTray = SystemTray();
-  final AppWindow _appWindow = AppWindow();
+  final system_tray.SystemTray _systemTray = system_tray.SystemTray();
+  final system_tray.AppWindow _appWindow = system_tray.AppWindow();
 
   Future<void> show() async {
     await windowManager.show();
@@ -196,58 +205,58 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
       tunLabel = '✔TUN';
     }
     final menu = [
-      MenuItem(label: 'Show', onClicked: show),
-      MenuItem(
+      system_tray.MenuItem(label: 'Show', onClicked: show),
+      system_tray.MenuItem(
           label: runLabel,
           onClicked: () {
             _switch();
           }),
-      MenuItem(
+      system_tray.MenuItem(
           label: tunLabel,
           onClicked: () {
             _patchConfig('', _tunmode ? 'false' : 'true');
           }),
-      SubMenu(
+      system_tray.SubMenu(
         label: "Mode",
         children: [
-          MenuItem(
+          system_tray.MenuItem(
             label: (_mode == 'rule' ? '✔' : '') + ruleLabel,
             onClicked: () {
               setState(() {
-                this._mode = 'rule';
+                _mode = 'rule';
               });
-              _patchConfig(this._mode, '');
+              _patchConfig(_mode, '');
             },
           ),
-          MenuItem(
+          system_tray.MenuItem(
             label: (_mode == 'direct' ? '✔' : '') + directLabel,
             onClicked: () {
               setState(() {
-                this._mode = 'direct';
+                _mode = 'direct';
               });
-              _patchConfig(this._mode, '');
+              _patchConfig(_mode, '');
             },
           ),
-          MenuItem(
+          system_tray.MenuItem(
             label: (_mode == 'global' ? '✔' : '') + globalLabel,
             onClicked: () {
               setState(() {
-                this._mode = 'global';
+                _mode = 'global';
               });
-              _patchConfig(this._mode, '');
+              _patchConfig(_mode, '');
             },
           ),
         ],
       ),
-      MenuItem(
+      system_tray.MenuItem(
           label: 'Dashboard',
           onClicked: () {
             _onOpenDashboard(PresentationStyle.sheet);
           }),
-      MenuItem(label: 'Hide', onClicked: hide),
-      MenuSeparator(),
-      MenuItem(label: 'Exit', onClicked: quit),
-      MenuItem(label: 'Stop&Exit', onClicked: stopAndQuit),
+      system_tray.MenuItem(label: 'Hide', onClicked: hide),
+      system_tray.MenuSeparator(),
+      system_tray.MenuItem(label: 'Exit', onClicked: quit),
+      system_tray.MenuItem(label: 'Stop&Exit', onClicked: stopAndQuit),
     ];
     await _systemTray.setContextMenu(menu);
   }
@@ -275,15 +284,15 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
     });
   }
 
-  String getBWHumanString(int BytePerSeconds){
-    if(BytePerSeconds > 1024*1024*1024){
-      return "${BytePerSeconds/1024/1024~/1024}G";
-    }else if(BytePerSeconds > 1024*1024){
-      return "${BytePerSeconds/1024~/1024}M";  
-    }else if(BytePerSeconds > 1024){
-      return "${BytePerSeconds~/1024}K";  
+  String getBWHumanString(int bytePerSeconds){
+    if(bytePerSeconds > 1024*1024*1024){
+      return "${bytePerSeconds/1024/1024~/1024}G";
+    }else if(bytePerSeconds > 1024*1024){
+      return "${bytePerSeconds/1024~/1024}M";  
+    }else if(bytePerSeconds > 1024){
+      return "${bytePerSeconds~/1024}K";  
     }
-    return "$BytePerSeconds";
+    return "$bytePerSeconds";
   }
 
   void _connectws() async {
@@ -328,12 +337,12 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
     Directory directory = await getLibraryDirectory();
     var clashWorkdir = join(directory.path, "clashCore");
     var startCMD =
-        '/bin/bash "' + getCoreDir() + '/start.sh" "' + clashWorkdir + '"';
+        '/bin/bash "${getCoreDir()}/start.sh" "$clashWorkdir"';
     var stopCMD =
-        '/bin/bash "' + getCoreDir() + '/stop.sh" "' + clashWorkdir + '"';
+        '/bin/bash "${getCoreDir()}/stop.sh" "$clashWorkdir"';
     if (Platform.isWindows) {
-      startCMD = getCoreDir() + "win\\start.cmd";
-      stopCMD = getCoreDir() + "win\\stop.cmd";
+      startCMD = "${getCoreDir()}win\\start.cmd";
+      stopCMD = "${getCoreDir()}win\\stop.cmd";
     }
     _runing = !_runing;
     setState(() {
@@ -390,9 +399,11 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
         onPageStarted: (url) => print('Page started: $url'),
         onPageFinished: (url) => print('Page finished: $url'),
         onWebResourceError: (err) {
-          print(
+          if (kDebugMode) {
+            print(
             'Error: ${err.errorCode}, ${err.errorType}, ${err.domain}, ${err.description}',
           );
+          }
         },
       );
       final width = window.physicalSize.width;
@@ -407,11 +418,13 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
       // await Future.delayed(Duration(seconds: 5));
       // await webview.close();
     }else{
-      if (await canLaunch(url))
-        await launch(url);
-      else 
+      var uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+      } else {
         // can't launch url, there is some error
         throw "Could not launch $url";
+      }
     }
   }
 
@@ -436,7 +449,9 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
       }
       _loadConfig();
     }catch(e){
-      
+      if(kDebugMode){
+        print("error: $e");
+      }
     }
   }
 
@@ -450,15 +465,17 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
       File file = File(filePath!);
       if(file.existsSync()){
         try{
-          var config = file.readAsStringSync(encoding: Utf8Codec(allowMalformed: true));
+          var config = file.readAsStringSync(encoding: const Utf8Codec(allowMalformed: true));
           RegExp rx = RegExp(r'external-controller:\s+:(\d+)');
           var match = rx.firstMatch(config);
           if (match != null) {
-              print(match.group(1));
+              if (kDebugMode) {
+                print(match.group(1));
+              }
               var port = match.group(1);
               if(port != '9090'){
                 var destConfig = config.replaceAll(RegExp(r'external-controller:\s+:(\d+)'), 'external-controller: :9090');
-                await File(join(foler, 'config.yaml')).writeAsString(config.toString());
+                await File(join(foler, 'config.yaml')).writeAsString(destConfig.toString());
               }else{
                 file.copy(join(foler, 'config.yaml'));
               }
@@ -475,7 +492,9 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
           // config['tun'] = tun;
           // print(config.toString());
         }catch(e){
-          print(e);
+          if (kDebugMode) {
+            print(e);
+          }
           await file.copy(join(foler, 'config.yaml'));
         }
         await _onReloadConfigPressed();
@@ -523,14 +542,16 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
             'Content-Type': 'application/json',
           },
           body: mode != ''
-              ? '{"mode":"' + mode + '"}'
-              : '{"tun":'+jsonEncode(tun)+'}');
+              ? '{"mode":"$mode"}'
+              : '{"tun":${jsonEncode(tun)}}');
       if (response.statusCode == 204) {
         _loadConfig();
       } else {
-        print('{"tun":'+jsonEncode(tun));
-        print(response.statusCode);
-        print(utf8.decode(response.bodyBytes));
+        if (kDebugMode) {
+          print('{"tun":${jsonEncode(tun)}');
+          print(response.statusCode);
+          print(utf8.decode(response.bodyBytes));
+        }
         if (mode != '') {
           setState(() {
             _mode = '';
@@ -539,7 +560,9 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
         }
       }
     } catch (e) {
-      print(e);
+      if (kDebugMode) {
+        print(e);
+      }
       setState(() {
         _mode = '';
         _tunmode = false;
@@ -628,9 +651,9 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
                     groupValue: _mode,
                     onChanged: (value) {
                       setState(() {
-                        this._mode = 'rule';
+                        _mode = 'rule';
                       });
-                      _patchConfig(this._mode, '');
+                      _patchConfig(_mode, '');
                     }),
                 const Text("Rule"),
                 Radio(
@@ -638,9 +661,9 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
                     groupValue: _mode,
                     onChanged: (value) {
                       setState(() {
-                        this._mode = 'global';
+                        _mode = 'global';
                       });
-                      _patchConfig(this._mode, '');
+                      _patchConfig(_mode, '');
                     }),
                 const Text("Global"),
                 Radio(
@@ -648,23 +671,23 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
                     groupValue: _mode,
                     onChanged: (value) {
                       setState(() {
-                        this._mode = 'direct';
+                        _mode = 'direct';
                       });
-                      _patchConfig(this._mode, '');
+                      _patchConfig(_mode, '');
                     }),
                 const Text("Direct"),
               ],
             ),
             CupertinoButton(
-              child: Text('DashBoard'),
+              child: const Text('DashBoard'),
               onPressed: () => _onOpenDashboard(PresentationStyle.modal),
             ),
             CupertinoButton(
-              child: Text('ReloadConfig'),
+              child: const Text('ReloadConfig'),
               onPressed: () => _onReloadConfigPressed(),
             ),
             CupertinoButton(
-              child: Text('ChooseConfig'),
+              child: const Text('ChooseConfig'),
               onPressed: () => _onChooseConfig(),
             ),
           ],
