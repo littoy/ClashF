@@ -21,6 +21,8 @@ import 'package:localstorage/localstorage.dart';
 import 'package:system_tray/system_tray.dart' as system_tray;
 import 'package:url_launcher/url_launcher.dart';
 
+import 'NavigationService.dart';
+
 String getCoreDir() {
   String mainPath = Platform.resolvedExecutable;
   if (Platform.isWindows) {
@@ -38,6 +40,19 @@ String getCoreExePath() {
     clashEXE = join('win', 'clash.exe');
   }
   return join(getCoreDir(), clashEXE);
+}
+
+void gShowToast(String msg) {
+  BuildContext? context = NavigationService.navigatorKey.currentContext;
+  if(context != null){
+    final scaffold = ScaffoldMessenger.of(context);
+    scaffold.showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        action: SnackBarAction(label: 'Clash', onPressed: scaffold.hideCurrentSnackBar),
+      ),
+    );
+  }
 }
 
 void main() async {
@@ -124,6 +139,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: NavigationService.navigatorKey,
       title: 'Clash Core Manager',
       theme: ThemeData(
         // This is the theme of your application.
@@ -169,7 +185,7 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
   var _channel;
   var icon = const Icon(Icons.play_circle);
   final system_tray.SystemTray _systemTray = system_tray.SystemTray();
-  final system_tray.AppWindow _appWindow = system_tray.AppWindow();
+  // final system_tray.AppWindow _appWindow = system_tray.AppWindow();
 
   Future<void> show() async {
     await windowManager.show();
@@ -319,6 +335,7 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
       });
     }).catchError((onError) {
       if (_runState == 'Runing') {
+        gShowToast("Waiting start...");
         Future.delayed(const Duration(seconds: 2), () {
           _connectws();
         });
@@ -371,7 +388,7 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
           _runing = false;
           icon = const Icon(Icons.play_circle);
         });
-        print('start error!');
+        gShowToast("Retry update status");
       });
     } else {
       await run(stopCMD)
@@ -385,7 +402,7 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
                 _loadConfig()
               })
           .catchError((onError) {
-        print('stop error!');
+        gShowToast("Stop error: $onError");
       });
     }
   }
@@ -399,11 +416,7 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
         onPageStarted: (url) => print('Page started: $url'),
         onPageFinished: (url) => print('Page finished: $url'),
         onWebResourceError: (err) {
-          if (kDebugMode) {
-            print(
-            'Error: ${err.errorCode}, ${err.errorType}, ${err.domain}, ${err.description}',
-          );
-          }
+          gShowToast("Load dashboard failed.");
         },
       );
       final width = window.physicalSize.width;
@@ -423,7 +436,8 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
         await launchUrl(uri);
       } else {
         // can't launch url, there is some error
-        throw "Could not launch $url";
+        gShowToast("Could not launch $url");
+        // throw "Could not launch $url";
       }
     }
   }
@@ -449,9 +463,7 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
       }
       _loadConfig();
     }catch(e){
-      if(kDebugMode){
-        print("error: $e");
-      }
+      gShowToast("Load config error: $e");
     }
   }
 
@@ -492,9 +504,7 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
           // config['tun'] = tun;
           // print(config.toString());
         }catch(e){
-          if (kDebugMode) {
-            print(e);
-          }
+          gShowToast("Load config error: $e");
           await file.copy(join(foler, 'config.yaml'));
         }
         await _onReloadConfigPressed();
@@ -528,6 +538,9 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
   }
 
   Future<void> _patchConfig(String mode, String openTun) async {
+    if (_runState != 'Runing') {
+      gShowToast("Not runing");
+    }
     var uri = Uri.parse('http://127.0.0.1:9090/configs');
     var tun = <String, dynamic>{};
     if(openTun != ''){
@@ -547,6 +560,9 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
       if (response.statusCode == 204) {
         _loadConfig();
       } else {
+        if (_runState == 'Runing') {
+          gShowToast("Update config fail: ${response.statusCode}");
+        }
         if (kDebugMode) {
           print('{"tun":${jsonEncode(tun)}');
           print(response.statusCode);
@@ -560,9 +576,7 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
         }
       }
     } catch (e) {
-      if (kDebugMode) {
-        print(e);
-      }
+       gShowToast("Update config fail: $e");
       setState(() {
         _mode = '';
         _tunmode = false;
