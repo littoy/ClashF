@@ -496,6 +496,9 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
       ? await getLibraryDirectory()
       : await getApplicationDocumentsDirectory();
       var foler = join(directory.path, "clashCore");
+      if(Platform.isWindows){
+       foler = "${getCoreDir()}\\win";
+      }
       File file = File(filePath!);
       if(file.existsSync()){
         try{
