@@ -56,7 +56,7 @@ void gShowToast(String msg) {
 }
 
 void main() async {
-  String packageVersion = '1.1';
+  String packageVersion = '1.2';
   WidgetsFlutterBinding.ensureInitialized();
   // Must add this line.
   await windowManager.ensureInitialized();
@@ -77,7 +77,10 @@ void main() async {
   Directory directory = Platform.isIOS || Platform.isMacOS
       ? await getLibraryDirectory()
       : await getApplicationDocumentsDirectory();
-  var foler = join(directory.path, "clashCore");
+  var folder = join(directory.path, "clashCore");
+  if(Platform.isWindows){
+    folder = "${getCoreDir()}\\win";
+  }
 
   var corePath = getCoreExePath();
 
@@ -90,9 +93,11 @@ void main() async {
     print("corePath:$corePath");
   }
 
-  if (ver != packageVersion) {
+  File file = File(join(folder,"config.yaml"));
+  
+  if (ver != packageVersion || !file.existsSync()) {
     try {
-      Directory(foler).createSync();
+      Directory(folder).createSync();
     } catch (e) {
       if (kDebugMode) {
         print(e);
@@ -102,12 +107,20 @@ void main() async {
     var fileName = 'Country.mmdb';
     var data = await rootBundle.load("assets/core/$fileName");
     var bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-    await File(join(foler, fileName)).writeAsBytes(bytes);
+    await File(join(folder, fileName)).writeAsBytes(bytes);
 
     fileName = 'geosite.dat';
     data = await rootBundle.load("assets/core/$fileName");
     bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-    await File(join(foler, fileName)).writeAsBytes(bytes);
+    await File(join(folder, fileName)).writeAsBytes(bytes);
+
+    if(!file.existsSync()){
+      fileName = 'config.yaml';
+      data = await rootBundle.load("assets/core/$fileName");
+      bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+      await File(join(folder, fileName)).writeAsBytes(bytes);
+    }
+
 
     if (Platform.isWindows) {}
 
@@ -351,15 +364,20 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
   }
 
   Future<void> _switch() async {
-    Directory directory = await getLibraryDirectory();
+    Directory directory = Platform.isIOS || Platform.isMacOS
+      ? await getLibraryDirectory()
+      : await getApplicationDocumentsDirectory();
+    
     var clashWorkdir = join(directory.path, "clashCore");
+    var workspace = "${getCoreDir()}";
     var startCMD =
         '/bin/bash "${getCoreDir()}/start.sh" "$clashWorkdir"';
     var stopCMD =
         '/bin/bash "${getCoreDir()}/stop.sh" "$clashWorkdir"';
     if (Platform.isWindows) {
-      startCMD = "${getCoreDir()}win\\start.cmd";
-      stopCMD = "${getCoreDir()}win\\stop.cmd";
+      startCMD = "${getCoreDir()}\\win\\start.cmd";
+      stopCMD = "${getCoreDir()}\\win\\stop.cmd";
+      workspace = "${getCoreDir()}\\win";
     }
     _runing = !_runing;
     setState(() {
@@ -371,7 +389,7 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
       _runState = _runing ? 'Runing' : 'Stoped';
     });
     if (_runing) {
-      await run(startCMD)
+      await run(startCMD,throwOnError: true,workingDirectory: workspace)
           .then((result) => {
                 Future.delayed(const Duration(seconds: 1), () {
                   _connectws();
@@ -381,17 +399,18 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
                 })
               })
           .catchError((onError) {
-        Future.delayed(const Duration(seconds: 1), () {
-          _connectws();
-        });
-        setState(() {
-          _runing = false;
-          icon = const Icon(Icons.play_circle);
-        });
-        gShowToast("Retry update status");
+            Future.delayed(const Duration(seconds: 1), () {
+              _connectws();
+            });
+            setState(() {
+              _runing = false;
+              icon = const Icon(Icons.play_circle);
+            });
+            gShowToast("Retry update status");
+            return onError;
       });
     } else {
-      await run(stopCMD)
+      await run(stopCMD,throwOnError: true,workingDirectory: workspace)
           .then((result) => {
                 // _closews(),
                 setState(() {
@@ -473,7 +492,9 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
 
     if (result != null) {
       String? filePath = result.files.single.path;
-      Directory directory = await getLibraryDirectory();
+      Directory directory = Platform.isIOS || Platform.isMacOS
+      ? await getLibraryDirectory()
+      : await getApplicationDocumentsDirectory();
       var foler = join(directory.path, "clashCore");
       File file = File(filePath!);
       if(file.existsSync()){

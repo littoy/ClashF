@@ -1,0 +1,99 @@
+port: 7890
+socks-port: 7891
+allow-lan: true
+mode: global
+log-level: error
+external-controller: :9090
+cfw-latency-timeout: 1000
+sniffing: true
+
+# interface-name: en0
+tun:
+  enable: true
+  stack: gvisor
+  dns-hijack:
+    - 0.0.0.0:53 #本地的dns设置为 223.6.6.6 和 8.8.8.8，不要用网关dns，会被跳过
+  auto-route: true
+  auto-detect-interface: true
+
+dns:
+  enable: true
+  ipv6: false
+  listen: 0.0.0.0:8053
+  enhanced-mode: redir-host
+  # enhanced-mode: redir-host # 或 fake-ip
+  # # fake-ip-range: 198.18.0.1/16 # 如果你不知道这个参数的作用，请勿修改
+  use-hosts: true 
+  default-nameserver:
+     - 223.6.6.6
+     - 114.114.114.114
+  nameserver:
+    - 202.96.134.133
+    - 114.114.114.114
+    # - 114.114.114.114
+    # - 223.6.6.6
+    # - https://dns.alidns.com/dns-query
+    # - tls://dot.pub:853
+    # - https://223.5.5.5/dns-query
+    # - tls://dns.rubyfish.cn:853
+    # - https://dns.rubyfish.cn/dns-query
+    # - https://dns.pub/dns-query
+    # - https://a.passcloud.xyz/dns-query
+
+  fallback:
+    # - tls://dns.google:853#DNS节点
+    # - tls://dns.google#DNS节点
+    # - https://dns.rubyfish.cn/dns-query
+    - https://dns.pub/dns-query
+    # - tcp://1.1.1.1
+    # - https://1.1.1.1/dns-query#DNS节点
+    # - https://i.passcloud.xyz/dns-query
+    # - quic://a.passcloud.xyz:784
+    # - https://a.passcloud.xyz/dns-query
+    # - tls://dns.rubyfish.cn:853
+    # - https://cloudflare-dns.com/dns-query
+    # - https://dns.google/dns-query#DNS节点
+  fallback-filter:
+    geoip: false
+    geosite:
+      - gfw
+      - google
+    ipcidr:
+      - 0.0.0.0/32
+    domain:
+      - '+.google.com'
+      - 'youtube.com'
+      - 'youtu.be'
+      - '+.youtu.be'
+      - '+.youtube.com'
+      - '+.appspot.com'
+      - '+.telegram.com'
+      - '+.facebook.com'
+      - '+.twitter.com'
+      - '+.blogger.com'
+      - '+.gmail.com'
+      - '+.ytimg.com'
+      - '+.gvt1.com'
+      - '+.github.com'
+      - '+.githubusercontent.com'
+      - '+.gstatic.com'
+      - '+.google-analytics.com'
+      - '+.googletagmanager.com'
+      - 'cdn.ampproject.org'
+      - '+.googleapis.com'
+      - '+.google-analytics.com'
+      - '+.gvt2.com'
+      - '+.googlevideo.com'
+      - '+.googleadservices.com'
+      - '+.googlesyndication.com'
+      - '+.doubleclick.net'
+      - '+.missav.com'
+      - '+.garenanow.com'
+      - 'telegram.me'
+      - '+.telegram.me'
+      - 't.me'
+      - 'telegram.org'
+      - '+.telegram.org'
+      - 'dandanzan.cc'
+      - '+.dandanzan.cc'
+
