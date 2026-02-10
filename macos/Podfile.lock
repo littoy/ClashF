@@ -1,28 +1,32 @@
 PODS:
+  - file_picker (0.0.1):
+    - FlutterMacOS
   - flutter_archive (0.0.1):
     - FlutterMacOS
-    - ZIPFoundation (= 0.9.13)
+    - ZIPFoundation (= 0.9.19)
   - flutter_macos_webview (0.0.4):
     - FlutterMacOS
   - FlutterMacOS (1.0.0)
-  - path_provider_macos (0.0.1):
+  - path_provider_foundation (0.0.1):
+    - Flutter
     - FlutterMacOS
-  - screen_retriever (0.0.1):
+  - screen_retriever_macos (0.0.1):
     - FlutterMacOS
   - system_tray (0.0.1):
     - FlutterMacOS
   - url_launcher_macos (0.0.1):
     - FlutterMacOS
-  - window_manager (0.2.0):
+  - window_manager (0.5.0):
     - FlutterMacOS
-  - ZIPFoundation (0.9.13)
+  - ZIPFoundation (0.9.19)
 
 DEPENDENCIES:
+  - file_picker (from `Flutter/ephemeral/.symlinks/plugins/file_picker/macos`)
   - flutter_archive (from `Flutter/ephemeral/.symlinks/plugins/flutter_archive/macos`)
   - flutter_macos_webview (from `Flutter/ephemeral/.symlinks/plugins/flutter_macos_webview/macos`)
   - FlutterMacOS (from `Flutter/ephemeral`)
-  - path_provider_macos (from `Flutter/ephemeral/.symlinks/plugins/path_provider_macos/macos`)
-  - screen_retriever (from `Flutter/ephemeral/.symlinks/plugins/screen_retriever/macos`)
+  - path_provider_foundation (from `Flutter/ephemeral/.symlinks/plugins/path_provider_foundation/darwin`)
+  - screen_retriever_macos (from `Flutter/ephemeral/.symlinks/plugins/screen_retriever_macos/macos`)
   - system_tray (from `Flutter/ephemeral/.symlinks/plugins/system_tray/macos`)
   - url_launcher_macos (from `Flutter/ephemeral/.symlinks/plugins/url_launcher_macos/macos`)
   - window_manager (from `Flutter/ephemeral/.symlinks/plugins/window_manager/macos`)
@@ -32,16 +36,18 @@ SPEC REPOS:
     - ZIPFoundation
 
 EXTERNAL SOURCES:
+  file_picker:
+    :path: Flutter/ephemeral/.symlinks/plugins/file_picker/macos
   flutter_archive:
     :path: Flutter/ephemeral/.symlinks/plugins/flutter_archive/macos
   flutter_macos_webview:
     :path: Flutter/ephemeral/.symlinks/plugins/flutter_macos_webview/macos
   FlutterMacOS:
     :path: Flutter/ephemeral
-  path_provider_macos:
-    :path: Flutter/ephemeral/.symlinks/plugins/path_provider_macos/macos
-  screen_retriever:
-    :path: Flutter/ephemeral/.symlinks/plugins/screen_retriever/macos
+  path_provider_foundation:
+    :path: Flutter/ephemeral/.symlinks/plugins/path_provider_foundation/darwin
+  screen_retriever_macos:
+    :path: Flutter/ephemeral/.symlinks/plugins/screen_retriever_macos/macos
   system_tray:
     :path: Flutter/ephemeral/.symlinks/plugins/system_tray/macos
   url_launcher_macos:
@@ -50,15 +56,16 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral/.symlinks/plugins/window_manager/macos
 
 SPEC CHECKSUMS:
-  flutter_archive: b9204ab1f7855c9a140af6937ed5fcd86294ea0f
+  file_picker: 7584aae6fa07a041af2b36a2655122d42f578c1a
+  flutter_archive: 07888d9aeb79da005e0ad8b9d347d17cdea07f68
   flutter_macos_webview: 5904525c4e6901c8784e43fe08e22dd0969d5fff
   FlutterMacOS: 8f6f14fa908a6fb3fba0cd85dbd81ec4b251fb24
-  path_provider_macos: 82d15581c31241db7014019d6dc07fa7204c261d
-  screen_retriever: 4f97c103641aab8ce183fa5af3b87029df167936
+  path_provider_foundation: 080d55be775b7414fd5a5ef3ac137b97b097e564
+  screen_retriever_macos: 452e51764a9e1cdb74b3c541238795849f21557f
   system_tray: 53f0cdb020c3fbee711d3fe45ae7ce730e033d2b
-  url_launcher_macos: 6349d2dd3f37b716ba25744e549144d6e0194edd
-  window_manager: 1d01fa7ac65a6e6f83b965471b1a7fdd3f06166c
-  ZIPFoundation: ae5b4b813d216d3bf0a148773267fff14bd51d37
+  url_launcher_macos: 0fba8ddabfc33ce0a9afe7c5fef5aab3d8d2d673
+  window_manager: b729e31d38fb04905235df9ea896128991cad99e
+  ZIPFoundation: b8c29ea7ae353b309bc810586181fd073cb3312c
 
 PODFILE CHECKSUM: 353c8bcc5d5b0994e508d035b5431cfe18c1dea7
 
