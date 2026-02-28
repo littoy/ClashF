@@ -38,7 +38,7 @@ dependencies:
   window_manager: ^0.5.1
   path_provider: ^2.0.9
   web_socket_channel: ^3.0.3
-  flutter_macos_webview: ^0.0.6
+  flutter_inappwebview: ^6.1.5
   http: ^1.6.0
   file: ^7.0.1
   file_picker: ^10.3.10

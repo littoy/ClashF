@@ -13,6 +13,13 @@ import '../utils/platform_utils.dart';
 class ClashService {
   static const String _apiBaseUrl = 'http://127.0.0.1:9090';
 
+  Future<String> getWorkDir() async {
+    Directory directory = Platform.isIOS || Platform.isMacOS
+        ? await getLibraryDirectory()
+        : await getApplicationDocumentsDirectory();
+    return join(directory.path, "clashCore");
+  }
+
   Future<void> installHelper() async {
     if (!Platform.isMacOS) return;
 
@@ -43,11 +50,7 @@ class ClashService {
   }
 
   Future<void> switchCore(bool isTargetRunning) async {
-    Directory directory = Platform.isIOS || Platform.isMacOS
-      ? await getLibraryDirectory()
-      : await getApplicationDocumentsDirectory();
-    
-    var clashWorkdir = join(directory.path, "clashCore");
+    var clashWorkdir = await getWorkDir();
     var coreDir = PlatformUtils.getCoreDir();
     var workspace = coreDir;
     var startCMD =

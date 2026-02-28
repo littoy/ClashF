@@ -1,7 +1,8 @@
 import 'dart:io';
+import 'dart:collection';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_macos_webview/flutter_macos_webview.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -87,7 +88,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
       onToggleRun: _toggleRun,
       onToggleTun: _toggleTun,
       onModeChange: _changeMode,
-      onOpenDashboard: () => _openDashboard(PresentationStyle.sheet),
+      onOpenDashboard: () => _openDashboard(),
       onInstallHelper: _clashService.installHelper,
       onHide: _hideWindow,
       onQuit: _quit,
@@ -98,7 +99,8 @@ class _HomePageState extends State<HomePage> with WindowListener {
   Future<void> _toggleRun() async {
     setState(() {
       _running = !_running;
-      _runState = _running ? 'Running' : 'Stopped';
+      _tunMode = _running ? _tunMode : false;
+      _runState = _running ? (_tunMode ? 'TUN模式' : 'Running') : 'Stopped';
     });
     try {
       await _clashService.switchCore(_running); // Note: logic in switchCore might be flipped in my implementation vs original? 
@@ -117,6 +119,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
         setState(() {
           _icon = const Icon(Icons.stop_circle);
         });
+        _loadConfig();
       } else {
         // Stopped successfully
         setState(() {
@@ -124,7 +127,6 @@ class _HomePageState extends State<HomePage> with WindowListener {
           _tunMode = false;
         });
         _trayService.setTitle('');
-        _loadConfig();
       }
     } catch (e) {
        // Error handling
@@ -164,11 +166,13 @@ class _HomePageState extends State<HomePage> with WindowListener {
       setState(() {
         _mode = config['mode'];
         _tunMode = config['tun']['enable'];
+        _runState = _running ? (_tunMode ? 'TUN模式' : 'Running') : 'Stopped';
       });
     } else {
       setState(() {
         _mode = '';
         _tunMode = false;
+        _runState = _running ? (_tunMode ? 'TUN模式' : 'Running') : 'Stopped';
       });
     }
     _updateTray();
@@ -182,7 +186,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
 
       _trayService.setTitle(_getBWHumanString(total));
       setState(() {
-        _speed = stat.toString();
+        _speed = "${_getBWHumanString(up)}↑ ${_getBWHumanString(down)}↓ 连接数: ${stat['count']}";
         // If we receive data, we are running
         if (!_running) {
            _running = true;
@@ -192,7 +196,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
         }
       });
     }, onError: (err) {
-      if (_runState == 'Running') {
+      if (_running) {
         showToast("Waiting start..." + err.toString());
         Future.delayed(const Duration(seconds: 2), () {
           _connectWs();
@@ -212,27 +216,27 @@ class _HomePageState extends State<HomePage> with WindowListener {
     return "$bytePerSeconds";
   }
 
-  Future<void> _openDashboard(PresentationStyle presentationStyle) async {
+  Future<void> _openDashboard() async {
+    //先检查当前主窗口是否在前台显示
+    if (!await windowManager.isVisible()) {
+      await windowManager.show();
+    }
     const url = 'http://127.0.0.1:8571/index.html#/proxies';
-    if (Platform.isMacOS) {
-      final webview = FlutterMacOSWebView(
-        onOpen: () => print('Opened'),
-        onClose: () => print('Closed'),
-        onPageStarted: (url) => print('Page started: $url'),
-        onPageFinished: (url) => print('Page finished: $url'),
-        onWebResourceError: (err) {
-          showToast("Load dashboard failed.");
-        },
-      );
+    if (Platform.isMacOS || Platform.isWindows) {
+      Size oldSize = await windowManager.getSize();
       final width = View.of(context).physicalSize.width;
-      await webview.open(
-        url: url,
-        presentationStyle: presentationStyle,
-        size: Size(width > 1280 ? 1200.0 : 860.0, 600.0),
-        modalTitle: 'DashBoard',
-        userAgent:
-            'Mozilla/5.0 (iPhone; CPU iPhone OS 14_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1',
+      await windowManager.setSize(Size(width > 1280 ? 1200 : 860, 650),);
+      await windowManager.center();
+
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => DashboardPage(url: url),
+        ),
       );
+
+      await windowManager.setSize(oldSize);
+      await windowManager.center();
     } else {
       var uri = Uri.parse(url);
       if (await canLaunchUrl(uri)) {
@@ -243,11 +247,29 @@ class _HomePageState extends State<HomePage> with WindowListener {
     }
   }
 
+  Future<void> _openConfigFolder() async {
+    var dir = await _clashService.getWorkDir();
+    if (!await Directory(dir).exists()) {
+      await Directory(dir).create(recursive: true);
+    }
+    if (Platform.isWindows) {
+      await Process.run('explorer', [dir]);
+    } else if (Platform.isMacOS) {
+      await Process.run('open', [dir]);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
+        centerTitle: true,
+        toolbarHeight: kToolbarHeight + (Platform.isMacOS ? 10.0 : 0.0),
+        flexibleSpace: DragToMoveArea(
+            child: Container(
+          height: kToolbarHeight + (Platform.isMacOS ? 10.0 : 0.0),
+        )),
       ),
       body: Center(
         child: Column(
@@ -258,10 +280,20 @@ class _HomePageState extends State<HomePage> with WindowListener {
             ),
             Text(
               _runState,
-              style: Theme.of(context).textTheme.headlineSmall,
+              style: Theme.of(context).textTheme.titleSmall,
             ),
             Text(
               _speed,
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _running ? _openDashboard : null,
+              child: const Text('Dashboard'),
+            ),
+            const SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: _openConfigFolder,
+              child: const Text('Config Folder'),
             ),
           ],
         ),
@@ -274,3 +306,55 @@ class _HomePageState extends State<HomePage> with WindowListener {
     );
   }
 }
+
+class DashboardPage extends StatefulWidget {
+  final String url;
+
+  const DashboardPage({Key? key, required this.url}) : super(key: key);
+
+  @override
+  State<DashboardPage> createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends State<DashboardPage> {
+  InAppWebViewController? webViewController;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        title: const Text("Dashboard"),
+        centerTitle: true,
+        toolbarHeight: kToolbarHeight + (Platform.isMacOS ? 10.0 : 0.0),
+        flexibleSpace: DragToMoveArea(
+            child: Container(
+          height: kToolbarHeight + (Platform.isMacOS ? 10.0 : 0.0),
+        )),
+      ),
+      body: SafeArea(
+        child: InAppWebView(
+        initialUrlRequest: URLRequest(url: WebUri(widget.url)),
+        initialSettings: InAppWebViewSettings(
+          userAgent:
+              'Mozilla/5.0 (iPhone; CPU iPhone OS 14_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1',
+        ),
+        onWebViewCreated: (controller) {
+          webViewController = controller;
+        },
+        onLoadStart: (controller, url) {
+          print("Page started: $url");
+        },
+        onLoadStop: (controller, url) {
+          print("Page finished: $url");
+        },
+        onReceivedError: (controller, request, error) {
+          print("Load dashboard failed: $error");
+          showToast("Load dashboard failed.");
+        },
+      ),
+      ),
+    );
+  }
+}
+

@@ -7,7 +7,7 @@ import Foundation
 
 import file_picker
 import flutter_archive
-import flutter_macos_webview
+import flutter_inappwebview_macos
 import path_provider_foundation
 import screen_retriever_macos
 import system_tray
@@ -17,7 +17,7 @@ import window_manager
 func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
   FilePickerPlugin.register(with: registry.registrar(forPlugin: "FilePickerPlugin"))
   FlutterArchivePlugin.register(with: registry.registrar(forPlugin: "FlutterArchivePlugin"))
-  FlutterMacOSWebViewPlugin.register(with: registry.registrar(forPlugin: "FlutterMacOSWebViewPlugin"))
+  InAppWebViewFlutterPlugin.register(with: registry.registrar(forPlugin: "InAppWebViewFlutterPlugin"))
   PathProviderPlugin.register(with: registry.registrar(forPlugin: "PathProviderPlugin"))
   ScreenRetrieverMacosPlugin.register(with: registry.registrar(forPlugin: "ScreenRetrieverMacosPlugin"))
   SystemTrayPlugin.register(with: registry.registrar(forPlugin: "SystemTrayPlugin"))
