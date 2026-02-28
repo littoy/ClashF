@@ -30,6 +30,8 @@ class _HomePageState extends State<HomePage> with WindowListener {
   bool _tunMode = false;
   String _speed = '';
   String _mode = '';
+  bool isWaiting = false;
+  bool stopActionInProgress = false;
   Icon _icon = const Icon(Icons.play_circle);
   
   // Timer? _retryTimer;
@@ -101,6 +103,8 @@ class _HomePageState extends State<HomePage> with WindowListener {
       _running = !_running;
       _tunMode = _running ? _tunMode : false;
       _runState = _running ? (_tunMode ? 'TUN模式' : 'Running') : 'Stopped';
+      isWaiting = true;
+      stopActionInProgress = !_running;
     });
     try {
       await _clashService.switchCore(_running); // Note: logic in switchCore might be flipped in my implementation vs original? 
@@ -113,11 +117,12 @@ class _HomePageState extends State<HomePage> with WindowListener {
       
       if (_running) {
         // Started successfully
-        Future.delayed(const Duration(seconds: 1), () {
+        Future.delayed(const Duration(seconds: 3), () {
           _connectWs();
         });
         setState(() {
           _icon = const Icon(Icons.stop_circle);
+          isWaiting = false;
         });
         _loadConfig();
       } else {
@@ -125,6 +130,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
         setState(() {
           _icon = const Icon(Icons.play_circle);
           _tunMode = false;
+          isWaiting = false;
         });
         _trayService.setTitle('');
       }
@@ -132,7 +138,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
        // Error handling
        if (_running) {
          // Failed to start
-          Future.delayed(const Duration(seconds: 1), () {
+          Future.delayed(const Duration(seconds: 3), () {
             _connectWs();
           });
           setState(() {
@@ -142,7 +148,14 @@ class _HomePageState extends State<HomePage> with WindowListener {
           showToast("Retry update status");
        } else {
          showToast("Stop error: $e");
+         setState(() {
+          _icon = const Icon(Icons.play_circle);
+          _tunMode = false;
+          isWaiting = false;
+        });
+        _trayService.setTitle('');
        }
+       isWaiting = false;
     }
     _updateTray();
   }
@@ -178,8 +191,10 @@ class _HomePageState extends State<HomePage> with WindowListener {
     _updateTray();
   }
 
+  var retryCount = 0;
   void _connectWs() {
     _wsService.connect().listen((stat) {
+      retryCount = 0;
       var up = stat['up'];
       var down = stat['down'];
       var total = up + down;
@@ -188,7 +203,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
       setState(() {
         _speed = "${_getBWHumanString(up)}↑ ${_getBWHumanString(down)}↓ 连接数: ${stat['count']}";
         // If we receive data, we are running
-        if (!_running) {
+        if (!_running && !stopActionInProgress) {
            _running = true;
            _runState = 'Running';
            _icon = const Icon(Icons.stop_circle);
@@ -197,9 +212,13 @@ class _HomePageState extends State<HomePage> with WindowListener {
       });
     }, onError: (err) {
       if (_running) {
-        showToast("Waiting start..." + err.toString());
+        //showToast("Waiting start..." + err.toString());
         Future.delayed(const Duration(seconds: 2), () {
-          _connectWs();
+          retryCount++;
+          if(!_wsService.isConnected() && retryCount < 5){
+            _connectWs();
+          }
+       
         });
       }
     });
@@ -299,7 +318,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _toggleRun,
+        onPressed: isWaiting ? null : _toggleRun,
         tooltip: 'Run/Stop',
         child: _icon,
       ),

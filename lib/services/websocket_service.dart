@@ -38,4 +38,8 @@ class WebSocketService {
     _channel?.sink.close(status.goingAway);
     _channel = null;
   }
+
+  bool isConnected() {
+    return _channel != null;
+  }
 }

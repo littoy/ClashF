@@ -17,7 +17,12 @@ class ClashService {
     Directory directory = Platform.isIOS || Platform.isMacOS
         ? await getLibraryDirectory()
         : await getApplicationDocumentsDirectory();
-    return join(directory.path, "clashCore");
+    var folder = join(directory.path, "clashCore");
+    if(Platform.isWindows){
+      folder = "${PlatformUtils.getCoreDir()}\\win";
+    }
+    return folder;
+
   }
 
   Future<void> installHelper() async {
@@ -62,13 +67,13 @@ class ClashService {
       stopCMD = "$coreDir\\win\\stop.cmd";
       workspace = "$coreDir\\win";
     }
-
+    var throwOnError = Platform.isWindows ? false : true;
     if (isTargetRunning) {
       // Start
-      await run(startCMD, throwOnError: true, workingDirectory: workspace);
+      await run(startCMD, throwOnError: throwOnError, workingDirectory: workspace);
     } else {
       // Stop
-      await run(stopCMD, throwOnError: true, workingDirectory: workspace);
+      await run(stopCMD, throwOnError: throwOnError, workingDirectory: workspace);
     }
   }
 
@@ -114,7 +119,11 @@ class ClashService {
     var tun = <String, dynamic>{};
     if (openTun != null && openTun.isNotEmpty) {
       tun['enable'] = openTun == 'false' ? false : true;
-      tun['stack'] = 'system';
+      if(Platform.isWindows){
+        tun['stack'] = 'gvisor';
+        }else{
+        tun['stack'] = 'system';
+      }
       tun['auto-route'] = true;
       tun['dns-hijack'] = ['0.0.0.0:53'];
     }

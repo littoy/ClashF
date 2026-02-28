@@ -32,6 +32,7 @@ void showToast(String msg) {
       SnackBar(
         content: Text(msg),
         action: SnackBarAction(label: 'Dismiss', onPressed: scaffold.hideCurrentSnackBar),
+        duration: const Duration(seconds: 1),
       ),
     );
   }
