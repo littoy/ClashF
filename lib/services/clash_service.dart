@@ -105,7 +105,7 @@ class ClashService {
         body: "{}",
       );
       if (response.statusCode == 204) {
-        showToast("Config reload success.");
+        showToast(I18n.s('Reload Config', '重载配置') + " " + I18n.s('Success', '成功'));
         return true;
       }
     } catch (e) {
@@ -121,7 +121,7 @@ class ClashService {
       tun['enable'] = openTun == 'false' ? false : true;
       if(Platform.isWindows){
         tun['stack'] = 'gvisor';
-        }else{
+      }else{
         tun['stack'] = 'system';
       }
       tun['auto-route'] = true;

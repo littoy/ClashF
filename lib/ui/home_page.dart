@@ -91,6 +91,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
       onToggleTun: _toggleTun,
       onModeChange: _changeMode,
       onOpenDashboard: () => _openDashboard(),
+      onReloadConfig: _reloadConfig,
       onInstallHelper: _clashService.installHelper,
       onHide: _hideWindow,
       onQuit: _quit,
@@ -102,7 +103,9 @@ class _HomePageState extends State<HomePage> with WindowListener {
     setState(() {
       _running = !_running;
       _tunMode = _running ? _tunMode : false;
-      _runState = _running ? (_tunMode ? 'TUN模式' : 'Running') : 'Stopped';
+      _runState = _running
+          ? (_tunMode ? I18n.s('TUN mode', 'TUN模式') : I18n.s('Running', '运行中'))
+          : I18n.s('Stopped', '已停止');
       isWaiting = true;
       stopActionInProgress = !_running;
     });
@@ -179,13 +182,17 @@ class _HomePageState extends State<HomePage> with WindowListener {
       setState(() {
         _mode = config['mode'];
         _tunMode = config['tun']['enable'];
-        _runState = _running ? (_tunMode ? 'TUN模式' : 'Running') : 'Stopped';
+        _runState = _running
+            ? (_tunMode ? I18n.s('TUN mode', 'TUN模式') : I18n.s('Running', '运行中'))
+            : I18n.s('Stopped', '已停止');
       });
     } else {
       setState(() {
         _mode = '';
         _tunMode = false;
-        _runState = _running ? (_tunMode ? 'TUN模式' : 'Running') : 'Stopped';
+        _runState = _running
+            ? (_tunMode ? I18n.s('TUN mode', 'TUN模式') : I18n.s('Running', '运行中'))
+            : I18n.s('Stopped', '已停止');
       });
     }
     _updateTray();
@@ -201,11 +208,12 @@ class _HomePageState extends State<HomePage> with WindowListener {
 
       _trayService.setTitle(_getBWHumanString(total));
       setState(() {
-        _speed = "${_getBWHumanString(up)}↑ ${_getBWHumanString(down)}↓ 连接数: ${stat['count']}";
+        _speed =
+            "${_getBWHumanString(up)}↑ ${_getBWHumanString(down)}↓ ${I18n.s('Connections', '连接数')}: ${stat['count']}";
         // If we receive data, we are running
         if (!_running && !stopActionInProgress) {
            _running = true;
-           _runState = 'Running';
+           _runState = I18n.s('Running', '运行中');
            _icon = const Icon(Icons.stop_circle);
            _updateTray();
         }
@@ -277,6 +285,13 @@ class _HomePageState extends State<HomePage> with WindowListener {
       await Process.run('open', [dir]);
     }
   }
+ 
+  Future<void> _reloadConfig() async {
+    var ok = await _clashService.reloadConfig();
+    if (ok) {
+      _loadConfig();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -294,9 +309,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            const Text(
-              'Clash Run Status:',
-            ),
+            Text(I18n.s('Clash Status:', '运行状态')),
             Text(
               _runState,
               style: Theme.of(context).textTheme.titleSmall,
@@ -307,12 +320,17 @@ class _HomePageState extends State<HomePage> with WindowListener {
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: _running ? _openDashboard : null,
-              child: const Text('Dashboard'),
+              child: Text(I18n.s('Dashboard', '控制面板')),
             ),
             const SizedBox(height: 10),
             ElevatedButton(
               onPressed: _openConfigFolder,
-              child: const Text('Config Folder'),
+              child: Text(I18n.s('Config Folder', '配置文件夹')),
+            ),
+            const SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: _reloadConfig,
+              child: Text(I18n.s('Reload Config', '重载配置')),
             ),
           ],
         ),
@@ -376,4 +394,3 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 }
-

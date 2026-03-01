@@ -41,6 +41,8 @@ void main() async {
     folder = "${PlatformUtils.getCoreDir()}\\win";
   }
 
+  await I18n.init(PlatformUtils.getCoreDir());
+
   var corePath = PlatformUtils.getCoreExePath();
 
   if(ver!=null){
@@ -128,11 +130,11 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: NavigationService.navigatorKey,
-      title: 'Clash Core Manager',
+      title: 'FastClash',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: const HomePage(title: 'Clash Core Manager'),
+      home: const HomePage(title: 'FastClash'),
     );
   }
 }
