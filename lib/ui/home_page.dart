@@ -226,7 +226,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
           if(!_wsService.isConnected() && retryCount < 5){
             _connectWs();
           }
-       
+
         });
       }
     });
@@ -285,7 +285,17 @@ class _HomePageState extends State<HomePage> with WindowListener {
       await Process.run('open', [dir]);
     }
   }
- 
+
+  Future<void> _openConfigEditor() async {
+    const url = 'http://127.0.0.1:9090/ui/fb-mok-config/';
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else {
+      showToast("Could not launch $url");
+    }
+  }
+
   Future<void> _reloadConfig() async {
     var ok = await _clashService.reloadConfig();
     if (ok) {
@@ -321,6 +331,11 @@ class _HomePageState extends State<HomePage> with WindowListener {
             ElevatedButton(
               onPressed: _running ? _openDashboard : null,
               child: Text(I18n.s('Dashboard', '控制面板')),
+            ),
+            const SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: _openConfigEditor,
+              child: Text(I18n.s('Config Editor', '配置编辑')),
             ),
             const SizedBox(height: 10),
             ElevatedButton(

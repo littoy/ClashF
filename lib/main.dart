@@ -14,7 +14,7 @@ import 'ui/home_page.dart';
 import 'utils/platform_utils.dart';
 
 void main() async {
-  String packageVersion = '1.3';
+  String packageVersion = '1.4';
   WidgetsFlutterBinding.ensureInitialized();
   // Must add this line.
   await windowManager.ensureInitialized();
