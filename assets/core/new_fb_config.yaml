@@ -1,0 +1,74 @@
+accounts:
+  1184368433234906:
+    2026-03-01:
+      mark: 广告户1
+      spent: 10001.00
+      reach: 7003
+      impression: 8003
+      clicks: 6001
+      frequency: 1.14
+      complete_registration: 3001
+      purchase: 1800
+      cost_per_action_complete_registration: 3.33
+      cost_per_action_purchase: 5.56
+    2026-03-03:
+      mark: 广告户1
+      spent: 10003.00
+      reach: 7003
+      impression: 8003
+      clicks: 6001
+      frequency: 1.14
+      complete_registration: 3001
+      purchase: 1800
+      cost_per_action_complete_registration: 3.33
+      cost_per_action_purchase: 5.56
+  1725361161496847:
+    2026-03-03:
+      mark: legacy-migrated-from-fbbusiness_view-total
+      spent: 10000.00
+      reach: 7003
+      impression: 10002
+      clicks: 1001
+      frequency: 1.1
+      complete_registration: 101
+      purchase: 11
+      cost_per_action_purchase: 69.05
+  2084651242304060:
+    2026-03-03:
+      mark: legacy-migrated-from-fb_ads_config
+      spent: 10015.00
+      reach: 6442
+      impression: 10001
+      clicks: 1001
+      complete_registration: 101
+      purchase: 11
+      cost_per_action_complete_registration: 69.05
+      cost_per_action_purchase: 69.05
+  678205151361620:
+    2026-03-01:
+      spent: 13000.00
+      reach: 9003
+      impression: 10002
+      clicks: 1001
+      frequency: 1.1
+      complete_registration: 101
+      purchase: 11
+      cost_per_action_purchase: 69.05
+    2026-03-03:
+      spent: 10000.00
+      reach: 7003
+      impression: 10002
+      clicks: 1001
+      frequency: 1.1
+      complete_registration: 101
+      purchase: 11
+      cost_per_action_purchase: 69.05
+    2026-04-02:
+      spent: 20000.00
+      reach: 7003
+      impression: 10002
+      clicks: 1001
+      frequency: 1.1
+      complete_registration: 101
+      purchase: 11
+      cost_per_action_purchase: 69.05

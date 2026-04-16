@@ -14,11 +14,11 @@ mitm-port: 7894
 mitm:
   hosts: # use for others proxy type. E.g: TUN, socks
     - +.facebook.com
-    - +.fbcdn.net
+    # - +.fbcdn.net
     - +.perplaystudio.com
   rules: # rewrite rules
     # - '^https?://static\.xx\.fbcdn\.net/rsrc.php.* url reject-img'
-    - '^https?://www\.baidu\.com/ url reject-img'
+    # - '^https?://www\.baidu\.com/ url reject-img'
     # - '^https?://www\.facebook\.com/1 url reject' # The "reject" returns HTTP status code 404 with no content.
     # - '^https?://www\.facebook\.com/2 url reject-200' # The "reject-200" returns HTTP status code 200 with no content.
     # - '^https?://www\.facebook\.com/3 url reject-img' # The "reject-img" returns HTTP status code 200 with content of 1px png.
@@ -38,7 +38,7 @@ mitm:
 
 # interface-name: en0
 tun:
-  enable: false
+  enable: true
   stack: system #gvisor
   dns-hijack:
     - 0.0.0.0:53 #本地的dns设置为 223.6.6.6 和 8.8.8.8，不要用网关dns，会被跳过
@@ -114,8 +114,20 @@ dns:
       - "+.fbcdn.net"
 
 proxies:
-- name: ttin-ssg01
-  server: ttin.freeme.icu
+- name: s-us3
+  server: s.apphaodian.com
+  port: 32689
+  type: trojan
+  password: "exXnbm!23Ab0oK"
+  udp: true
+  network: tcp
+  flow: "xtls-rprx-direct"
+  sni: us3.akdfj.com
+  timeout: 450
+  max-fail: 2
+  forbid-duration: 900
+- name: s-ssg01
+  server: s.apphaodian.com
   port: 32689
   type: trojan
   password: "exXnbm!23Ab0oK"
@@ -135,16 +147,19 @@ proxy-groups:
     lazy: false
     interval: 300
     proxies:
+      - s-us3
+      - s-ssg01
       - 🎯 全球直连
-      - ttin-ssg01
   - name: 🎯 全球直连
     type: select
     proxies:
       - DIRECT
   - name: DNS节点
     type: select
+    auto-backup: true
     proxies:
-      - ttin-ssg01
+      - s-ssg01
+      - s-us3
       - DIRECT
 
 rules:

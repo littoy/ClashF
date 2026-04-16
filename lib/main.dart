@@ -82,21 +82,21 @@ void main() async {
       await File(join(folder, fileName)).writeAsBytes(bytes);
     }
 
-    file = File(join(folder,"fbbusiness_view.yaml"));
+    file = File(join(folder,"new_fb_config.yaml"));
     if(!file.existsSync()){
-      fileName = 'fbbusiness_view.yaml';
+      fileName = 'new_fb_config.yaml';
       data = await rootBundle.load("assets/core/$fileName");
       bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
       await File(join(folder, fileName)).writeAsBytes(bytes);
     }
 
-    file = File(join(folder,"fb_ads_config.yaml"));
-    if(!file.existsSync()){
-      fileName = 'fb_ads_config.yaml';
-      data = await rootBundle.load("assets/core/$fileName");
-      bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-      await File(join(folder, fileName)).writeAsBytes(bytes);
-    }
+    // file = File(join(folder,"fb_ads_config.yaml"));
+    // if(!file.existsSync()){
+    //   fileName = 'fb_ads_config.yaml';
+    //   data = await rootBundle.load("assets/core/$fileName");
+    //   bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+    //   await File(join(folder, fileName)).writeAsBytes(bytes);
+    // }
 
 
     if (Platform.isWindows) {}
