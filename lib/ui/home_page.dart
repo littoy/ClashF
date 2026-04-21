@@ -122,12 +122,12 @@ class _HomePageState extends State<HomePage> with WindowListener {
         // Started successfully
         Future.delayed(const Duration(seconds: 3), () {
           _connectWs();
+          _loadConfig();
         });
         setState(() {
           _icon = const Icon(Icons.stop_circle);
           isWaiting = false;
         });
-        _loadConfig();
       } else {
         // Stopped successfully
         setState(() {
@@ -180,20 +180,20 @@ class _HomePageState extends State<HomePage> with WindowListener {
     var config = await _clashService.loadConfig();
     if (config != null) {
       setState(() {
-        _mode = config['mode'];
-        _tunMode = config['tun']['enable'];
+        _mode = config['mode'] ?? '';
+        _tunMode = config['tun']?['enable'] ?? false;
         _runState = _running
             ? (_tunMode ? I18n.s('TUN mode', 'TUN模式') : I18n.s('Running', '运行中'))
             : I18n.s('Stopped', '已停止');
       });
     } else {
-      setState(() {
-        _mode = '';
-        _tunMode = false;
-        _runState = _running
-            ? (_tunMode ? I18n.s('TUN mode', 'TUN模式') : I18n.s('Running', '运行中'))
-            : I18n.s('Stopped', '已停止');
-      });
+      if (!_running) {
+        setState(() {
+          _mode = '';
+          _tunMode = false;
+          _runState = I18n.s('Stopped', '已停止');
+        });
+      }
     }
     _updateTray();
   }

@@ -70,12 +70,21 @@ void main() async {
     var bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
     await File(join(folder, fileName)).writeAsBytes(bytes);
 
-    fileName = 'geosite.dat';
+    fileName = 'GeoSite.dat';
     data = await rootBundle.load("assets/core/$fileName");
     bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
     await File(join(folder, fileName)).writeAsBytes(bytes);
 
     if(!file.existsSync()){
+      fileName = 'config.yaml';
+      data = await rootBundle.load("assets/core/$fileName");
+      bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+      await File(join(folder, fileName)).writeAsBytes(bytes);
+    }else{
+      // 备份旧配置
+      var oldConfig = await file.readAsBytes();
+      await File(join(folder, "config_$ver.bak.yaml")).writeAsBytes(oldConfig);
+      // 写入新配置
       fileName = 'config.yaml';
       data = await rootBundle.load("assets/core/$fileName");
       bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
