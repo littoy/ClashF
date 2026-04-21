@@ -7,7 +7,7 @@ import 'package:web_socket_channel/status.dart' as status;
 
 class WebSocketService {
   IOWebSocketChannel? _channel;
-  static const String _wsUrl = "ws://127.0.0.1:9090/traffic?token=";
+  static const String _wsUrl = "ws://127.0.0.1:9393/traffic?token=";
 
   Stream<Map<String, dynamic>> connect() {
     // ignore: close_sinks

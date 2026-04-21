@@ -287,7 +287,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
   }
 
   Future<void> _openConfigEditor() async {
-    const url = 'http://127.0.0.1:9090/ui/fb-mok-config/';
+    const url = 'http://127.0.0.1:9393/ui/fb-mok-config/';
     final uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);

@@ -9,8 +9,8 @@ flutter run -d macos
 flutter run -d windows
 
 ## build
-flutter build macos
-flutter build windows
+flutter build macos --release
+flutter build windows --release
 
 ## core
 core from: https://github.com/yaling888/clash

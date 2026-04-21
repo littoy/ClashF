@@ -11,7 +11,7 @@ import 'package:process_run/shell_run.dart';
 import '../utils/platform_utils.dart';
 
 class ClashService {
-  static const String _apiBaseUrl = 'http://127.0.0.1:9090';
+  static const String _apiBaseUrl = 'http://127.0.0.1:9393';
 
   Future<String> getWorkDir() async {
     Directory directory = Platform.isIOS || Platform.isMacOS
@@ -170,8 +170,8 @@ class ClashService {
                 print(match.group(1));
               }
               var port = match.group(1);
-              if(port != '9090'){
-                var destConfig = config.replaceAll(RegExp(r'external-controller:\s+:(\d+)'), 'external-controller: :9090');
+              if(port != '9393'){
+                var destConfig = config.replaceAll(RegExp(r'external-controller:\s+:(\d+)'), 'external-controller: :9393');
                 await File(join(folder, 'config.yaml')).writeAsString(destConfig.toString());
               }else{
                 file.copy(join(folder, 'config.yaml'));

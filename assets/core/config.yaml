@@ -1,9 +1,9 @@
-port: 7890
-socks-port: 7891
+port: 7693
+socks-port: 7695
 allow-lan: true
 mode: rule
 log-level: error
-external-controller: :9090
+external-controller: :9393
 # secret: "980123XiopP!Pll23-"
 cfw-latency-timeout: 1000
 sniffing: true
