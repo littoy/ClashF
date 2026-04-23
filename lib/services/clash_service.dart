@@ -7,11 +7,32 @@ import 'package:http/http.dart' as http;
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:process_run/shell_run.dart';
+import 'package:yaml/yaml.dart';
 
 import '../utils/platform_utils.dart';
 
 class ClashService {
-  static const String _apiBaseUrl = 'http://127.0.0.1:9393';
+  static String extPort = '9393';
+  static String get _apiBaseUrl => 'http://127.0.0.1:$extPort';
+
+  static Future<void> initExtPort() async {
+    try {
+      var folder = await ClashService().getWorkDir();
+      var file = File(join(folder, "config.yaml"));
+      if (file.existsSync()) {
+        var configStr = await file.readAsString(encoding: const Utf8Codec(allowMalformed: true));
+        var doc = loadYaml(configStr);
+        if (doc != null && doc['external-controller'] != null) {
+          String extCtrl = doc['external-controller'].toString();
+          extPort = extCtrl.split(':').last;
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print("Init extPort error: $e");
+      }
+    }
+  }
 
   Future<String> getWorkDir() async {
     Directory directory = Platform.isIOS || Platform.isMacOS
@@ -162,23 +183,17 @@ class ClashService {
       File file = File(filePath!);
       if(file.existsSync()){
         try{
-          var config = file.readAsStringSync(encoding: const Utf8Codec(allowMalformed: true));
-          RegExp rx = RegExp(r'external-controller:\s+:(\d+)');
-          var match = rx.firstMatch(config);
-          if (match != null) {
+          var configStr = file.readAsStringSync(encoding: const Utf8Codec(allowMalformed: true));
+          var doc = loadYaml(configStr);
+          if (doc != null && doc['external-controller'] != null) {
+              String extCtrl = doc['external-controller'].toString();
+              var port = extCtrl.split(':').last;
               if (kDebugMode) {
-                print(match.group(1));
+                print("Found port: $port");
               }
-              var port = match.group(1);
-              if(port != '9393'){
-                var destConfig = config.replaceAll(RegExp(r'external-controller:\s+:(\d+)'), 'external-controller: :9393');
-                await File(join(folder, 'config.yaml')).writeAsString(destConfig.toString());
-              }else{
-                file.copy(join(folder, 'config.yaml'));
-              }
-          }else{
-            file.copy(join(folder, 'config.yaml'));
+              extPort = port;
           }
+          await file.copy(join(folder, 'config.yaml'));
           showToast("Update success.");
         }catch(e){
           showToast("Parse config error: $e,just copy");

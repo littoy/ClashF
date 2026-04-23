@@ -5,9 +5,11 @@ import 'dart:io';
 import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/status.dart' as status;
 
+import 'clash_service.dart';
+
 class WebSocketService {
   IOWebSocketChannel? _channel;
-  static const String _wsUrl = "ws://127.0.0.1:9393/traffic?token=";
+  String get _wsUrl => "ws://127.0.0.1:${ClashService.extPort}/traffic?token=";
 
   Stream<Map<String, dynamic>> connect() {
     // ignore: close_sinks

@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'NavigationService.dart';
+import 'services/clash_service.dart';
 import 'ui/home_page.dart';
 import 'utils/platform_utils.dart';
 
@@ -112,6 +113,7 @@ void main() async {
 
     localStorage.setItem('ver', packageVersion);
   }
+  await ClashService.initExtPort();
   startHttpServer(join(PlatformUtils.getCoreDir(), 'public'));
   runApp(const MyApp());
 }
