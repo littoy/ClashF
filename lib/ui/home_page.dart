@@ -3,6 +3,7 @@ import 'dart:collection';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:localstorage/localstorage.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -30,6 +31,10 @@ class _HomePageState extends State<HomePage> with WindowListener {
   bool _tunMode = false;
   String _speed = '';
   String _mode = '';
+  String _activeProfile = '';
+  List<String> _profiles = [];
+  int _port = 0;
+  int _socksPort = 0;
   bool isWaiting = false;
   bool stopActionInProgress = false;
   Icon _icon = const Icon(Icons.play_circle);
@@ -44,10 +49,61 @@ class _HomePageState extends State<HomePage> with WindowListener {
   }
 
   void _init() async {
-    await _trayService.init(_showWindow);
+    await _trayService.init(_showWindow, _onMenuOpen);
+    var savedProfile = await _clashService.getActiveProfile();
+    if (savedProfile.isEmpty) {
+      savedProfile = localStorage.getItem('active_profile') ?? 'config.yaml';
+    }
+    _activeProfile = savedProfile;
+    _profiles = await _clashService.getConfigList();
+    if (!_profiles.contains(_activeProfile)) {
+      _profiles.insert(0, _activeProfile);
+    }
+    if (_profiles.isEmpty) {
+      _profiles.add('config.yaml');
+    }
     _connectWs();
     _loadConfig();
     _updateTray();
+  }
+
+  Future<void> _onMenuOpen() async {
+    _profiles = await _clashService.getConfigList();
+    if (!_profiles.contains(_activeProfile)) {
+      _profiles.insert(0, _activeProfile);
+    }
+    if (_profiles.isEmpty) {
+      _profiles.add('config.yaml');
+    }
+    _updateTray();
+  }
+
+  Future<void> _changeProfile(String profile) async {
+    setState(() {
+      _activeProfile = profile;
+    });
+    localStorage.setItem('active_profile', profile);
+    await _clashService.setActiveProfile(profile);
+    
+    String oldPort = ClashService.extPort;
+    await _clashService.changeProfile(profile, isRunning: _running);
+    
+    _profiles = await _clashService.getConfigList();
+    if (!_profiles.contains(_activeProfile)) {
+      _profiles.insert(0, _activeProfile);
+    }
+    if (_profiles.isEmpty) {
+      _profiles.add('config.yaml');
+    }
+    
+    if (oldPort != ClashService.extPort) {
+      _wsService.close();
+      if (_running) {
+        _connectWs();
+      }
+    }
+    
+    _loadConfig();
   }
 
   @override
@@ -86,10 +142,13 @@ class _HomePageState extends State<HomePage> with WindowListener {
       isRunning: _running,
       isTunMode: _tunMode,
       mode: _mode,
+      profiles: _profiles,
+      activeProfile: _activeProfile,
       onShow: _showWindow,
       onToggleRun: _toggleRun,
       onToggleTun: _toggleTun,
       onModeChange: _changeMode,
+      onProfileChange: _changeProfile,
       onOpenDashboard: () => _openDashboard(),
       onReloadConfig: _reloadConfig,
       onInstallHelper: _clashService.installHelper,
@@ -181,6 +240,8 @@ class _HomePageState extends State<HomePage> with WindowListener {
     if (config != null) {
       setState(() {
         _mode = config['mode'] ?? '';
+        _port = config['port'] ?? 0;
+        _socksPort = config['socks-port'] ?? 0;
         _tunMode = config['tun']?['enable'] ?? false;
         _runState = _running
             ? (_tunMode ? I18n.s('TUN mode', 'TUN模式') : I18n.s('Running', '运行中'))
@@ -190,6 +251,8 @@ class _HomePageState extends State<HomePage> with WindowListener {
       if (!_running) {
         setState(() {
           _mode = '';
+          _port = 0;
+          _socksPort = 0;
           _tunMode = false;
           _runState = I18n.s('Stopped', '已停止');
         });
@@ -248,7 +311,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
     if (!await windowManager.isVisible()) {
       await windowManager.show();
     }
-    const url = 'http://127.0.0.1:8571/index.html#/proxies';
+    final url = 'http://127.0.0.1:8571/index.html?hostname=127.0.0.1&port=${ClashService.extPort}#/proxies';
     if (Platform.isMacOS || Platform.isWindows) {
       Size oldSize = await windowManager.getSize();
       final width = View.of(context).physicalSize.width;
@@ -327,6 +390,9 @@ class _HomePageState extends State<HomePage> with WindowListener {
             Text(
               _speed,
             ),
+            const SizedBox(height: 10),
+            Text('${I18n.s('Profile:', '配置文件:')} $_activeProfile'),
+            Text('Port: $_port   Socks: $_socksPort   Mode: $_mode'),
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: _running ? _openDashboard : null,

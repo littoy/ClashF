@@ -8,7 +8,7 @@ import '../utils/platform_utils.dart';
 class TrayService {
   final system_tray.SystemTray _systemTray = system_tray.SystemTray();
 
-  Future<void> init(VoidCallback onShow) async {
+  Future<void> init(VoidCallback onShow, VoidCallback onMenuOpen) async {
     String path =
         Platform.isWindows ? 'assets/app_icon.ico' : 'assets/app_icon.png';
     
@@ -17,14 +17,16 @@ class TrayService {
       iconPath: path,
     );
 
-    _systemTray.registerSystemTrayEventHandler((eventName) {
+    _systemTray.registerSystemTrayEventHandler((eventName) async {
       debugPrint("eventName: $eventName");
       if (eventName == "leftMouseDown") {
         // Optional: show window on click
       } else if (eventName == system_tray.kSystemTrayEventClick) {
+        onMenuOpen();
         _systemTray.popUpContextMenu();
       } else if (eventName == "rightMouseDown") {
       } else if (eventName == system_tray.kSystemTrayEventRightClick) {
+        onMenuOpen();
         _systemTray.popUpContextMenu();
       }
     });
@@ -34,10 +36,13 @@ class TrayService {
     required bool isRunning,
     required bool isTunMode,
     required String mode,
+    required List<String> profiles,
+    required String activeProfile,
     required VoidCallback onShow,
     required VoidCallback onToggleRun,
     required VoidCallback onToggleTun,
     required Function(String) onModeChange,
+    required Function(String) onProfileChange,
     required VoidCallback onOpenDashboard,
     required VoidCallback onReloadConfig,
     required VoidCallback onInstallHelper,
@@ -73,6 +78,13 @@ class TrayService {
             onClicked: (menuItem) => onModeChange('global'),
           ),
         ],
+      ),
+      system_tray.SubMenu(
+        label: I18n.s("Profiles", "配置文件"),
+        children: profiles.map((p) => system_tray.MenuItemLabel(
+          label: (activeProfile == p ? '✔' : '') + p,
+          onClicked: (menuItem) => onProfileChange(p),
+        )).toList(),
       ),
       system_tray.MenuItemLabel(
           label: I18n.s('Dashboard', '控制面板'),

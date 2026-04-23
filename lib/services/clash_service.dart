@@ -34,6 +34,33 @@ class ClashService {
     }
   }
 
+  Future<String> getActiveProfile() async {
+    try {
+      var folder = await getWorkDir();
+      var file = File(join(folder, '.active_profile'));
+      if (file.existsSync()) {
+        return await file.readAsString();
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print("Read active profile error: $e");
+      }
+    }
+    return '';
+  }
+
+  Future<void> setActiveProfile(String profile) async {
+    try {
+      var folder = await getWorkDir();
+      var file = File(join(folder, '.active_profile'));
+      await file.writeAsString(profile);
+    } catch (e) {
+      if (kDebugMode) {
+        print("Save active profile error: $e");
+      }
+    }
+  }
+
   Future<String> getWorkDir() async {
     Directory directory = Platform.isIOS || Platform.isMacOS
         ? await getLibraryDirectory()
@@ -164,6 +191,68 @@ class ClashService {
       return true;
     } catch (e) {
       showToast("Update config fail: $e");
+      return false;
+    }
+  }
+
+  Future<List<String>> getConfigList() async {
+    var folder = await getWorkDir();
+    var dir = Directory(folder);
+    if (!dir.existsSync()) return [];
+    var files = dir.listSync();
+    List<String> list = [];
+    for (var f in files) {
+      if (f is File) {
+        var name = basename(f.path);
+        if (name.endsWith('.yaml') || name.endsWith('.yml')) {
+          if (name == 'config.yaml') continue; // Hide the active copy file
+          list.add(name);
+        }
+      }
+    }
+    return list;
+  }
+
+  Future<bool> changeProfile(String filename, {bool isRunning = false}) async {
+    try {
+      var folder = await getWorkDir();
+      var file = File(join(folder, filename));
+      if (!file.existsSync()) return false;
+      var configStr = await file.readAsString(encoding: const Utf8Codec(allowMalformed: true));
+      var doc = loadYaml(configStr);
+      
+      String? newExtPort;
+      if (doc != null && doc['external-controller'] != null) {
+          String extCtrl = doc['external-controller'].toString();
+          newExtPort = extCtrl.split(':').last;
+          if (kDebugMode) {
+            print("Found new port: $newExtPort");
+          }
+      }
+      
+      if (filename != 'config.yaml') {
+        await file.copy(join(folder, 'config.yaml'));
+      }
+      
+      if (newExtPort != null && newExtPort != extPort) {
+        // Port changed! We must restart the core to apply this.
+        if (isRunning) {
+           await switchCore(false); // Stop
+        }
+        extPort = newExtPort;
+        if (isRunning) {
+           await Future.delayed(const Duration(milliseconds: 600));
+           await switchCore(true); // Start with new config
+        }
+      } else {
+        if (isRunning) {
+          await reloadConfig();
+        }
+      }
+      showToast("Changed profile to $filename");
+      return true;
+    } catch (e) {
+      showToast("Change profile error: $e");
       return false;
     }
   }

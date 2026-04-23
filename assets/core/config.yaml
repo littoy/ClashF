@@ -13,9 +13,10 @@ mitm-port: 7894
 # Man-In-The-Middle attack
 mitm:
   hosts: # use for others proxy type. E.g: TUN, socks
-    - +.facebook.com
+    - adsmanager-graph.facebook.com
+    - adsmanager.facebook.com
     # - +.fbcdn.net
-    - +.perplaystudio.com
+    - app.perplaystudio.com
   rules: # rewrite rules
     # - '^https?://static\.xx\.fbcdn\.net/rsrc.php.* url reject-img'
     # - '^https?://www\.baidu\.com/ url reject-img'
@@ -115,7 +116,7 @@ dns:
 
 proxies:
 - name: s-us3
-  server: s.apphaodian.com
+  server: s2.apphaodian.com
   port: 32689
   type: trojan
   password: "exXnbm!23Ab0oK"
@@ -127,7 +128,7 @@ proxies:
   max-fail: 2
   forbid-duration: 900
 - name: s-ssg01
-  server: s.apphaodian.com
+  server: s2.apphaodian.com
   port: 32689
   type: trojan
   password: "exXnbm!23Ab0oK"
@@ -138,19 +139,47 @@ proxies:
   timeout: 450
   max-fail: 2
   forbid-duration: 900
+- name: us3
+  server: us3.apphaodian.com
+  port: 31689
+  type: trojan
+  password: "exXnbm!23Ab0oK"
+  udp: true
+  network: tcp
+  flow: "xtls-rprx-direct"
+  sni: 127.akdfj.com
+  timeout: 450
+  max-fail: 2
+  forbid-duration: 900
+- name: hkt2
+  server: hk01.apphaodian.com
+  port: 27651
+  type: trojan
+  password: "exXnbm!23Ab0oK"
+  udp: true
+  network: tcp
+  flow: "xtls-rprx-direct"
+  sni: 127.akdfj.com
+  timeout: 450
+  max-fail: 2
+  forbid-duration: 900
 
 proxy-groups:
   - name: 🔰 节点选择
-    type: select
+    type: url-test
     disable-udp: false
     auto-backup: false
     lazy: false
-    interval: 300
+    url: 'https://www.gstatic.com/generate_204'
+    interval: 61
+    tolerance: 55
     proxies:
       - s-us3
       - s-ssg01
-      - 🎯 全球直连
-  - name: 🎯 全球直连
+      - us3
+      - hkt2
+      - 全球直连-best
+  - name: 全球直连-best
     type: select
     proxies:
       - DIRECT
@@ -158,11 +187,14 @@ proxy-groups:
     type: select
     auto-backup: true
     proxies:
+      - 🔰 节点选择
       - s-ssg01
       - s-us3
+      - us3
+      - hkt2
       - DIRECT
 
 rules:
-  - GEOIP,CN,🎯 全球直连,no-resolve
+  - GEOIP,CN,全球直连-best,no-resolve
   - MATCH,🔰 节点选择
   
