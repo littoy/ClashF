@@ -13,8 +13,8 @@ mitm-port: 7894
 # Man-In-The-Middle attack
 mitm:
   hosts: # use for others proxy type. E.g: TUN, socks
-    - adsmanager-graph.facebook.com
-    - adsmanager.facebook.com
+    - +.facebook.com
+    - facebook.com
     # - +.fbcdn.net
     - app.perplaystudio.com
   rules: # rewrite rules
@@ -163,23 +163,30 @@ proxies:
   timeout: 450
   max-fail: 2
   forbid-duration: 900
+- name: home-best
+  server: git.utmcus.cn
+  port: 52008
+  type: ss
+  cipher: aes-128-gcm
+  password: fishGylK111111
+  udp: true
 
 proxy-groups:
   - name: 🔰 节点选择
-    type: url-test
+    type: select
     disable-udp: false
-    auto-backup: false
+    auto-backup: true
     lazy: false
     url: 'https://www.gstatic.com/generate_204'
-    interval: 61
-    tolerance: 55
+    interval: 121
     proxies:
+      - home-best
       - s-us3
       - s-ssg01
       - us3
       - hkt2
-      - 全球直连-best
-  - name: 全球直连-best
+      - 全球直连
+  - name: 全球直连
     type: select
     proxies:
       - DIRECT
@@ -195,6 +202,6 @@ proxy-groups:
       - DIRECT
 
 rules:
-  - GEOIP,CN,全球直连-best,no-resolve
+  - GEOIP,CN,全球直连,no-resolve
   - MATCH,🔰 节点选择
   
