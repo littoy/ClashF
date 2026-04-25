@@ -33,6 +33,8 @@ class _HomePageState extends State<HomePage> with WindowListener {
   String _mode = '';
   String _activeProfile = '';
   List<String> _profiles = [];
+  Map<String, dynamic> _proxyGroups = {};
+  Map<String, int> _proxyDelays = {};
   int _port = 0;
   int _socksPort = 0;
   bool isWaiting = false;
@@ -64,6 +66,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
     }
     _connectWs();
     _loadConfig();
+    _loadProxies();
     _updateTray();
   }
 
@@ -75,6 +78,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
     if (_profiles.isEmpty) {
       _profiles.add('config.yaml');
     }
+    await _loadProxies();
     _updateTray();
   }
 
@@ -104,6 +108,15 @@ class _HomePageState extends State<HomePage> with WindowListener {
     }
     
     _loadConfig();
+    _loadProxies();
+  }
+
+  Future<void> _changeProxy(String groupName, String proxyName) async {
+    bool success = await _clashService.selectProxy(groupName, proxyName);
+    if (success) {
+      await _loadProxies();
+      _updateTray();
+    }
   }
 
   @override
@@ -144,6 +157,9 @@ class _HomePageState extends State<HomePage> with WindowListener {
       mode: _mode,
       profiles: _profiles,
       activeProfile: _activeProfile,
+      proxyGroups: _proxyGroups,
+      proxyDelays: _proxyDelays,
+      onProxyChange: _changeProxy,
       onShow: _showWindow,
       onToggleRun: _toggleRun,
       onToggleTun: _toggleTun,
@@ -169,37 +185,30 @@ class _HomePageState extends State<HomePage> with WindowListener {
       stopActionInProgress = !_running;
     });
     try {
-      await _clashService.switchCore(_running); // Note: logic in switchCore might be flipped in my implementation vs original? 
-      // Original: if (_runing) run(startCMD) else run(stopCMD)
-      // My Service: if (!isRunning) run(startCMD) else run(stopCMD) -> Wait, let's check service logic.
-      // Service: if (!isRunning) { start } else { stop }. 
-      // If I pass `_running` (which is true), it executes stop. That's wrong.
-      // I need to fix the service or the call. 
-      // Let's assume I fix the service to take `start` boolean.
+      await _clashService.switchCore(_running); 
       
       if (_running) {
-        // Started successfully
         Future.delayed(const Duration(seconds: 3), () {
           _connectWs();
           _loadConfig();
+          _loadProxies();
         });
         setState(() {
           _icon = const Icon(Icons.stop_circle);
           isWaiting = false;
         });
       } else {
-        // Stopped successfully
         setState(() {
           _icon = const Icon(Icons.play_circle);
           _tunMode = false;
           isWaiting = false;
+          _proxyGroups = {};
+          _proxyDelays = {};
         });
         _trayService.setTitle('');
       }
     } catch (e) {
-       // Error handling
        if (_running) {
-         // Failed to start
           Future.delayed(const Duration(seconds: 3), () {
             _connectWs();
           });
@@ -233,6 +242,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
     });
     await _clashService.patchConfig(mode, '');
     _loadConfig();
+    _loadProxies();
   }
 
   Future<void> _loadConfig() async {
@@ -261,6 +271,54 @@ class _HomePageState extends State<HomePage> with WindowListener {
     _updateTray();
   }
 
+  Future<void> _loadProxies() async {
+    if (!_running) return;
+    var data = await _clashService.getProxies();
+    if (data != null && data['proxies'] != null) {
+      Map<String, dynamic> proxies = data['proxies'];
+      Map<String, dynamic> groups = {};
+      Map<String, int> delays = {};
+      
+      proxies.forEach((key, value) {
+        if (value['history'] != null && value['history'] is List && (value['history'] as List).isNotEmpty) {
+          var history = value['history'] as List;
+          var last = history.last;
+          if (last['delay'] != null && last['delay'] > 0) {
+            delays[key] = last['delay'] as int;
+          }
+        }
+
+        if (value['all'] != null && value['all'] is List && (value['all'] as List).isNotEmpty) {
+          if (value['type'] == 'Selector' || value['type'] == 'URLTest' || value['type'] == 'Fallback' || value['type'] == 'LoadBalance') {
+             groups[key] = value;
+          }
+        }
+      });
+      
+      Map<String, dynamic> sortedGroups = {};
+      var keys = groups.keys.toList();
+      keys.remove('GLOBAL');
+      for (var k in keys) {
+        sortedGroups[k] = groups[k];
+      }
+      if (groups.containsKey('GLOBAL')) {
+        sortedGroups['GLOBAL'] = groups['GLOBAL'];
+      }
+
+      setState(() {
+        _proxyGroups = sortedGroups;
+        _proxyDelays = delays;
+      });
+    }
+  }
+
+  String _getProxyDisplayName(String name) {
+    if (_proxyDelays.containsKey(name)) {
+      return '$name (${_proxyDelays[name]}ms)';
+    }
+    return name;
+  }
+
   var retryCount = 0;
   void _connectWs() {
     _wsService.connect().listen((stat) {
@@ -273,17 +331,16 @@ class _HomePageState extends State<HomePage> with WindowListener {
       setState(() {
         _speed =
             "${_getBWHumanString(up)}↑ ${_getBWHumanString(down)}↓ ${I18n.s('Connections', '连接数')}: ${stat['count']}";
-        // If we receive data, we are running
         if (!_running && !stopActionInProgress) {
            _running = true;
            _runState = I18n.s('Running', '运行中');
            _icon = const Icon(Icons.stop_circle);
+           _loadProxies();
            _updateTray();
         }
       });
     }, onError: (err) {
       if (_running) {
-        //showToast("Waiting start..." + err.toString());
         Future.delayed(const Duration(seconds: 2), () {
           retryCount++;
           if(!_wsService.isConnected() && retryCount < 5){
@@ -307,7 +364,6 @@ class _HomePageState extends State<HomePage> with WindowListener {
   }
 
   Future<void> _openDashboard() async {
-    //先检查当前主窗口是否在前台显示
     if (!await windowManager.isVisible()) {
       await windowManager.show();
     }
@@ -363,6 +419,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
     var ok = await _clashService.reloadConfig();
     if (ok) {
       _loadConfig();
+      _loadProxies();
     }
   }
 
@@ -379,41 +436,91 @@ class _HomePageState extends State<HomePage> with WindowListener {
         )),
       ),
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Text(I18n.s('Clash Status:', '运行状态')),
-            Text(
-              _runState,
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-            Text(
-              _speed,
-            ),
-            const SizedBox(height: 10),
-            Text('${I18n.s('Profile:', '配置文件:')} $_activeProfile'),
-            Text('Port: $_port   Socks: $_socksPort   Mode: $_mode'),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _running ? _openDashboard : null,
-              child: Text(I18n.s('Dashboard', '控制面板')),
-            ),
-            const SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: _openConfigEditor,
-              child: Text(I18n.s('Config Editor', '配置编辑')),
-            ),
-            const SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: _openConfigFolder,
-              child: Text(I18n.s('Config Folder', '配置文件夹')),
-            ),
-            const SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: _reloadConfig,
-              child: Text(I18n.s('Reload Config', '重载配置')),
-            ),
-          ],
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              Text(I18n.s('Clash Status:', '运行状态')),
+              Text(
+                _runState,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              Text(
+                _speed,
+              ),
+              const SizedBox(height: 10),
+              Text('${I18n.s('Profile:', '配置文件:')} $_activeProfile'),
+              Text('Port: $_port   Socks: $_socksPort   Mode: $_mode'),
+              if (_running) ...[
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: _openDashboard,
+                  child: Text(I18n.s('Dashboard', '控制面板')),
+                ),
+                const SizedBox(height: 10),
+                ElevatedButton(
+                  onPressed: _openConfigEditor,
+                  child: Text(I18n.s('Config Editor', '配置编辑')),
+                ),
+                const SizedBox(height: 10),
+                ElevatedButton(
+                  onPressed: _reloadConfig,
+                  child: Text(I18n.s('Reload Config', '重载配置')),
+                ),
+              ],
+              const SizedBox(height: 10),
+              ElevatedButton(
+                onPressed: _openConfigFolder,
+                child: Text(I18n.s('Config Folder', '配置文件夹')),
+              ),
+              if (_proxyGroups.isNotEmpty) const SizedBox(height: 20),
+              if (_proxyGroups.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: _proxyGroups.entries.map((entry) {
+                      String groupName = entry.key;
+                      String currentProxy = entry.value['now'] ?? '';
+                      List<dynamic> allProxies = entry.value['all'] ?? [];
+                      
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: Text(groupName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              flex: 3,
+                              child: DropdownButton<String>(
+                                isExpanded: true,
+                                value: allProxies.contains(currentProxy) ? currentProxy : null,
+                                hint: Text(_getProxyDisplayName(currentProxy)),
+                                items: allProxies.map<DropdownMenuItem<String>>((dynamic value) {
+                                  String nodeName = value.toString();
+                                  return DropdownMenuItem<String>(
+                                    value: nodeName,
+                                    child: Text(_getProxyDisplayName(nodeName), overflow: TextOverflow.ellipsis),
+                                  );
+                                }).toList(),
+                                onChanged: (String? newValue) {
+                                  if (newValue != null) {
+                                    _changeProxy(groupName, newValue);
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton(
@@ -460,14 +567,9 @@ class _DashboardPageState extends State<DashboardPage> {
         onWebViewCreated: (controller) {
           webViewController = controller;
         },
-        onLoadStart: (controller, url) {
-          print("Page started: $url");
-        },
-        onLoadStop: (controller, url) {
-          print("Page finished: $url");
-        },
+        onLoadStart: (controller, url) {},
+        onLoadStop: (controller, url) {},
         onReceivedError: (controller, request, error) {
-          print("Load dashboard failed: $error");
           showToast("Load dashboard failed.");
         },
       ),

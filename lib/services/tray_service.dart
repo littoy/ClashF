@@ -38,6 +38,9 @@ class TrayService {
     required String mode,
     required List<String> profiles,
     required String activeProfile,
+    required Map<String, dynamic> proxyGroups,
+    required Map<String, int> proxyDelays,
+    required Function(String, String) onProxyChange,
     required VoidCallback onShow,
     required VoidCallback onToggleRun,
     required VoidCallback onToggleTun,
@@ -54,7 +57,7 @@ class TrayService {
     var tunLabel = isTunMode ? '✔' + I18n.s('TUN mode', '增强模式') : I18n.s('TUN mode', '增强模式');
     final system_tray.Menu menu = system_tray.Menu();
 
-    await menu.buildFrom( [
+    List<system_tray.MenuItemBase> menuItems = [
       system_tray.MenuItemLabel(label: I18n.s('Show', '显示'), onClicked: (menuItem) =>onShow()),
       system_tray.MenuItemLabel(
           label: runLabel,
@@ -86,19 +89,56 @@ class TrayService {
           onClicked: (menuItem) => onProfileChange(p),
         )).toList(),
       ),
-      system_tray.MenuItemLabel(
-          label: I18n.s('Dashboard', '控制面板'),
-          onClicked: (menuItem) => onOpenDashboard()),
-      system_tray.MenuItemLabel(
-          label: I18n.s('Reload Config', '重载配置'),
-          onClicked: (menuItem) => onReloadConfig()),
-      if (Platform.isMacOS)
-        system_tray.MenuItemLabel(label: I18n.s('Install Helper', '安装权限助手'), onClicked: (menuItem) => onInstallHelper()),
+    ];
+
+    if (proxyGroups.isNotEmpty) {
+      menuItems.add(system_tray.MenuSeparator());
+      proxyGroups.forEach((groupName, groupData) {
+        String now = groupData['now'] ?? '';
+        List<dynamic> all = groupData['all'] ?? [];
+        
+        List<system_tray.MenuItemBase> children = all.map((node) {
+          String nodeName = node.toString();
+          String label = nodeName;
+          if (proxyDelays.containsKey(nodeName)) {
+            label = '$nodeName (${proxyDelays[nodeName]}ms)';
+          }
+          return system_tray.MenuItemLabel(
+            label: (now == nodeName ? '✔ ' : '') + label,
+            onClicked: (menuItem) => onProxyChange(groupName, nodeName),
+          );
+        }).toList();
+
+        menuItems.add(system_tray.SubMenu(
+          label: '$groupName: $now',
+          children: children,
+        ));
+      });
+    }
+
+    menuItems.add(system_tray.MenuSeparator());
+    if (isRunning) {
+      menuItems.addAll([
+        system_tray.MenuItemLabel(
+            label: I18n.s('Dashboard', '控制面板'),
+            onClicked: (menuItem) => onOpenDashboard()),
+        system_tray.MenuItemLabel(
+            label: I18n.s('Reload Config', '重载配置'),
+            onClicked: (menuItem) => onReloadConfig()),
+      ]);
+    }
+    
+    if (Platform.isMacOS) {
+      menuItems.add(system_tray.MenuItemLabel(label: I18n.s('Install Helper', '安装权限助手'), onClicked: (menuItem) => onInstallHelper()));
+    }
+    menuItems.addAll([
       system_tray.MenuItemLabel(label: I18n.s('Hide', '隐藏'), onClicked: (menuItem) => onHide()),
       system_tray.MenuSeparator(),
       system_tray.MenuItemLabel(label: I18n.s('Exit', '退出'), onClicked: (menuItem) => onQuit()),
       system_tray.MenuItemLabel(label: I18n.s('Stop & Exit', '停止并退出'), onClicked: (menuItem) => onStopAndQuit()),
     ]);
+
+    await menu.buildFrom(menuItems);
     await _systemTray.setContextMenu(menu);
   }
 

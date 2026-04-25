@@ -142,6 +142,46 @@ class ClashService {
     return null;
   }
 
+  Future<Map<String, dynamic>?> getProxies() async {
+    var uri = Uri.parse('$_apiBaseUrl/proxies');
+    try {
+      var response = await http.get(uri, headers: {
+        'Content-Type': 'application/json',
+      });
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print("Load proxies failed: $e");
+      }
+    }
+    return null;
+  }
+
+  Future<bool> selectProxy(String group, String proxy) async {
+    // URL encode the proxy group name and proxy name to handle special characters
+    var groupEncoded = Uri.encodeComponent(group);
+    var uri = Uri.parse('$_apiBaseUrl/proxies/$groupEncoded');
+    try {
+      var response = await http.put(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({"name": proxy}),
+      );
+      if (response.statusCode == 204) {
+        return true;
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print("Select proxy failed: $e");
+      }
+    }
+    return false;
+  }
+
   Future<bool> reloadConfig() async {
     var uri = Uri.parse('$_apiBaseUrl/configs');
     try {
