@@ -35,6 +35,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
   List<String> _profiles = [];
   Map<String, dynamic> _proxyGroups = {};
   Map<String, int> _proxyDelays = {};
+  Map<String, bool> _expandedGroups = {};
   int _port = 0;
   int _socksPort = 0;
   bool isWaiting = false;
@@ -131,7 +132,17 @@ class _HomePageState extends State<HomePage> with WindowListener {
     windowManager.setSkipTaskbar(true);
   }
 
+  @override
+  void onWindowFocus() {
+    if (_running) {
+      _loadProxies();
+    }
+  }
+
   Future<void> _showWindow() async {
+    if (_running) {
+      await _loadProxies();
+    }
     await windowManager.show();
     await windowManager.setSkipTaskbar(false);
   }
@@ -482,37 +493,99 @@ class _HomePageState extends State<HomePage> with WindowListener {
                     children: _proxyGroups.entries.map((entry) {
                       String groupName = entry.key;
                       String currentProxy = entry.value['now'] ?? '';
+                      String groupType = entry.value['type'] ?? 'Selector';
                       List<dynamic> allProxies = entry.value['all'] ?? [];
                       
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
+                      bool isExpanded = _expandedGroups[groupName] ?? false;
+                      bool showExpandButton = allProxies.length > 8;
+                      List<dynamic> displayProxies = isExpanded || !showExpandButton ? allProxies : allProxies.take(8).toList();
+                      
+                      if (!isExpanded && showExpandButton && !displayProxies.contains(currentProxy) && currentProxy.isNotEmpty) {
+                         if (displayProxies.isNotEmpty) {
+                           displayProxies[displayProxies.length - 1] = currentProxy;
+                         }
+                      }
+                      
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor.withOpacity(0.5))),
+                        ),
                         child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              flex: 2,
-                              child: Text(groupName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              flex: 3,
-                              child: DropdownButton<String>(
-                                isExpanded: true,
-                                value: allProxies.contains(currentProxy) ? currentProxy : null,
-                                hint: Text(_getProxyDisplayName(currentProxy)),
-                                items: allProxies.map<DropdownMenuItem<String>>((dynamic value) {
-                                  String nodeName = value.toString();
-                                  return DropdownMenuItem<String>(
-                                    value: nodeName,
-                                    child: Text(_getProxyDisplayName(nodeName), overflow: TextOverflow.ellipsis),
-                                  );
-                                }).toList(),
-                                onChanged: (String? newValue) {
-                                  if (newValue != null) {
-                                    _changeProxy(groupName, newValue);
-                                  }
-                                },
+                            SizedBox(
+                              width: 110,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(groupName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                  const SizedBox(height: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(color: Colors.blue),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(groupType, style: const TextStyle(color: Colors.blue, fontSize: 11)),
+                                  ),
+                                ],
                               ),
                             ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Wrap(
+                                spacing: 8.0,
+                                runSpacing: 8.0,
+                                children: displayProxies.map((dynamic value) {
+                                  String nodeName = value.toString();
+                                  bool isSelected = nodeName == currentProxy;
+                                  
+                                  return InkWell(
+                                    onTap: () {
+                                      _changeProxy(groupName, nodeName);
+                                    },
+                                    borderRadius: BorderRadius.circular(16),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: isSelected ? Colors.blue : Colors.transparent,
+                                        border: Border.all(color: isSelected ? Colors.blue : Theme.of(context).dividerColor),
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: Text(
+                                        _getProxyDisplayName(nodeName),
+                                        style: TextStyle(
+                                          color: isSelected ? Colors.white : Theme.of(context).textTheme.bodyMedium?.color,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                            if (showExpandButton)
+                              Padding(
+                                padding: const EdgeInsets.only(left: 8.0),
+                                child: TextButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _expandedGroups[groupName] = !isExpanded;
+                                    });
+                                  },
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: Text(
+                                    isExpanded ? I18n.s('Collapse', '收起') : I18n.s('Expand', '展开'),
+                                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       );
