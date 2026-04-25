@@ -84,7 +84,7 @@ class TrayService {
       ),
       system_tray.SubMenu(
         label: I18n.s("Profiles", "配置文件"),
-        children: profiles.map((p) => system_tray.MenuItemLabel(
+        children: profiles.where((p) => p != 'new_fb_config.yaml').map((p) => system_tray.MenuItemLabel(
           label: (activeProfile == p ? '✔' : '') + p,
           onClicked: (menuItem) => onProfileChange(p),
         )).toList(),

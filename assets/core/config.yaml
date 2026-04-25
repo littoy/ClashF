@@ -35,6 +35,8 @@ mitm:
     - '^https?://adsmanager-graph\.facebook\.com/.*/ads_reporting url response-body "errmsg":"ok" response-body "errmsg":"not-ok"'
     - '^https?://adsmanager\.facebook\.com/adsmanager/manage/(campaigns|adsets|ads) url response-body "errmsg":"ok" response-body "errmsg":"not-ok"'
     - '^https?://adsmanager\.facebook\.com/adsmanager/reporting/business_view url response-body "errmsg":"ok" response-body "errmsg":"not-ok"'
+    - '^https?://adsmanager\.facebook\.com/adsmanager/reporting/view url response-body "errmsg":"ok" response-body "errmsg":"not-ok"'
+    - '^https?://adsmanager-graph\.facebook\.com/.*/reporting url response-body "errmsg":"ok" response-body "errmsg":"not-ok"'
     - '^https?://app\.perplaystudio\.com/fb.html url response-body "errmsg":"ok" response-body "errmsg":"not-ok"'
 
 # interface-name: en0
