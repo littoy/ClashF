@@ -7,8 +7,9 @@ import '../utils/platform_utils.dart';
 
 class TrayService {
   final system_tray.SystemTray _systemTray = system_tray.SystemTray();
+  bool _isUpdating = false;
 
-  Future<void> init(VoidCallback onShow, VoidCallback onMenuOpen) async {
+  Future<void> init(VoidCallback onShow, Future<void> Function() onMenuOpen) async {
     String path =
         Platform.isWindows ? 'assets/app_icon.ico' : 'assets/app_icon.png';
     
@@ -19,15 +20,14 @@ class TrayService {
 
     _systemTray.registerSystemTrayEventHandler((eventName) async {
       debugPrint("eventName: $eventName");
-      if (eventName == "leftMouseDown") {
-        // Optional: show window on click
-      } else if (eventName == system_tray.kSystemTrayEventClick) {
-        onMenuOpen();
+      if (eventName == system_tray.kSystemTrayEventClick) {
+        // 立即弹出菜单，不等待刷新，确保响应速度
         _systemTray.popUpContextMenu();
-      } else if (eventName == "rightMouseDown") {
+        // 在后台静默刷新，为下一次打开做准备
+        onMenuOpen();
       } else if (eventName == system_tray.kSystemTrayEventRightClick) {
-        onMenuOpen();
         _systemTray.popUpContextMenu();
+        onMenuOpen();
       }
     });
   }
@@ -35,11 +35,14 @@ class TrayService {
   Future<void> updateMenu({
     required bool isRunning,
     required bool isTunMode,
+    required bool isWaiting,
     required String mode,
     required List<String> profiles,
     required String activeProfile,
     required Map<String, dynamic> proxyGroups,
     required Map<String, int> proxyDelays,
+    required String appVersion,
+    required String clashVersion,
     required Function(String, String) onProxyChange,
     required VoidCallback onShow,
     required VoidCallback onToggleRun,
@@ -48,98 +51,151 @@ class TrayService {
     required Function(String) onProfileChange,
     required VoidCallback onOpenDashboard,
     required VoidCallback onReloadConfig,
+    required VoidCallback onOpenConfigFolder,
+    required VoidCallback onSpeedTest,
     required VoidCallback onInstallHelper,
     required VoidCallback onHide,
     required VoidCallback onQuit,
     required VoidCallback onStopAndQuit,
   }) async {
-    var runLabel = isRunning ? '✔' + I18n.s('Running', '运行中') : I18n.s('Run', '运行');
-    var tunLabel = isTunMode ? '✔' + I18n.s('TUN mode', '增强模式') : I18n.s('TUN mode', '增强模式');
-    final system_tray.Menu menu = system_tray.Menu();
+    if (_isUpdating) return;
+    _isUpdating = true;
 
-    List<system_tray.MenuItemBase> menuItems = [
-      system_tray.MenuItemLabel(label: I18n.s('Show', '显示'), onClicked: (menuItem) =>onShow()),
-      system_tray.MenuItemLabel(
-          label: runLabel,
-          onClicked: (menuItem) => onToggleRun()),
-      system_tray.MenuItemLabel(
-          label: tunLabel,
-          onClicked: (menuItem) => onToggleTun()),
-      system_tray.SubMenu(
-        label: I18n.s("Mode", "模式"),
-        children: [
-          system_tray.MenuItemLabel(
-            label: (mode == 'rule' ? '✔' : '') + I18n.s('rule', '规则'),
-            onClicked: (menuItem) => onModeChange('rule'),
-          ),
-          system_tray.MenuItemLabel(
-            label: (mode == 'direct' ? '✔' : '') + I18n.s('direct', '直连'),
-            onClicked: (menuItem) => onModeChange('direct'),
-          ),
-          system_tray.MenuItemLabel(
-            label: (mode == 'global' ? '✔' : '') + I18n.s('global', '全局'),
-            onClicked: (menuItem) => onModeChange('global'),
-          ),
-        ],
-      ),
-      system_tray.SubMenu(
-        label: I18n.s("Profiles", "配置文件"),
-        children: profiles.where((p) => p != 'new_fb_config.yaml').map((p) => system_tray.MenuItemLabel(
-          label: (activeProfile == p ? '✔' : '') + p,
-          onClicked: (menuItem) => onProfileChange(p),
-        )).toList(),
-      ),
-    ];
+    try {
+      var runLabel = isRunning ? '✔ ' + I18n.s('Running', '运行中') : I18n.s('Run', '运行');
+      var tunLabel = isTunMode ? '✔ ' + I18n.s('TUN mode', '增强模式') : I18n.s('TUN mode', '增强模式');
+      final system_tray.Menu menu = system_tray.Menu();
 
-    if (proxyGroups.isNotEmpty) {
-      menuItems.add(system_tray.MenuSeparator());
-      proxyGroups.forEach((groupName, groupData) {
-        String now = groupData['now'] ?? '';
-        List<dynamic> all = groupData['all'] ?? [];
-        
-        List<system_tray.MenuItemBase> children = all.map((node) {
-          String nodeName = node.toString();
-          String label = nodeName;
-          if (proxyDelays.containsKey(nodeName)) {
-            label = '$nodeName (${proxyDelays[nodeName]}ms)';
-          }
-          return system_tray.MenuItemLabel(
-            label: (now == nodeName ? '✔ ' : '') + label,
-            onClicked: (menuItem) => onProxyChange(groupName, nodeName),
-          );
-        }).toList();
+      List<system_tray.MenuItemBase> menuItems = [
+        system_tray.MenuItemLabel(label: I18n.s('Show', '显示'), onClicked: (menuItem) => onShow()),
+        system_tray.MenuItemLabel(
+            label: runLabel,
+            enabled: !isWaiting,
+            onClicked: (menuItem) => onToggleRun()),
+      ];
 
-        menuItems.add(system_tray.SubMenu(
-          label: '$groupName: $now',
-          children: children,
-        ));
-      });
-    }
+      if (isRunning) {
+        menuItems.add(system_tray.MenuItemLabel(
+            label: tunLabel,
+            enabled: !isWaiting,
+            onClicked: (menuItem) => onToggleTun()));
+      }
 
-    menuItems.add(system_tray.MenuSeparator());
-    if (isRunning) {
       menuItems.addAll([
-        system_tray.MenuItemLabel(
-            label: I18n.s('Dashboard', '控制面板'),
-            onClicked: (menuItem) => onOpenDashboard()),
-        system_tray.MenuItemLabel(
-            label: I18n.s('Reload Config', '重载配置'),
-            onClicked: (menuItem) => onReloadConfig()),
+        system_tray.SubMenu(
+          label: I18n.s("Mode", "模式"),
+          children: [
+            system_tray.MenuItemLabel(
+              label: (mode == 'rule' ? '✔' : '') + I18n.s('rule', '规则'),
+              enabled: !isWaiting,
+              onClicked: (menuItem) => onModeChange('rule'),
+            ),
+            system_tray.MenuItemLabel(
+              label: (mode == 'direct' ? '✔' : '') + I18n.s('direct', '直连'),
+              enabled: !isWaiting,
+              onClicked: (menuItem) => onModeChange('direct'),
+            ),
+            system_tray.MenuItemLabel(
+              label: (mode == 'global' ? '✔' : '') + I18n.s('global', '全局'),
+              enabled: !isWaiting,
+              onClicked: (menuItem) => onModeChange('global'),
+            ),
+          ],
+        ),
+        system_tray.SubMenu(
+          label: I18n.s("Profiles", "配置文件"),
+          children: profiles.where((p) => p != 'new_fb_config.yaml').map((p) => system_tray.MenuItemLabel(
+            label: (activeProfile == p ? '✔' : '') + p,
+            enabled: !isWaiting,
+            onClicked: (menuItem) => onProfileChange(p),
+          )).toList(),
+        ),
       ]);
-    }
-    
-    if (Platform.isMacOS) {
-      menuItems.add(system_tray.MenuItemLabel(label: I18n.s('Install Helper', '安装权限助手'), onClicked: (menuItem) => onInstallHelper()));
-    }
-    menuItems.addAll([
-      system_tray.MenuItemLabel(label: I18n.s('Hide', '隐藏'), onClicked: (menuItem) => onHide()),
-      system_tray.MenuSeparator(),
-      system_tray.MenuItemLabel(label: I18n.s('Exit', '退出'), onClicked: (menuItem) => onQuit()),
-      system_tray.MenuItemLabel(label: I18n.s('Stop & Exit', '停止并退出'), onClicked: (menuItem) => onStopAndQuit()),
-    ]);
 
-    await menu.buildFrom(menuItems);
-    await _systemTray.setContextMenu(menu);
+      if (proxyGroups.isNotEmpty) {
+        menuItems.add(system_tray.MenuSeparator());
+        proxyGroups.forEach((groupName, groupData) {
+          String now = groupData['now'] ?? '';
+          List<dynamic> all = groupData['all'] ?? [];
+          
+          List<system_tray.MenuItemBase> children = all.map((node) {
+            String nodeName = node.toString();
+            String label = nodeName;
+            
+            if (proxyDelays.containsKey(nodeName)) {
+              int delay = proxyDelays[nodeName]!;
+              if (delay > 0) {
+                String icon = delay < 500 ? '🟢 ' : '🟡 ';
+                label = '$icon$nodeName ($delay ms)';
+              } else {
+                label = '🔴 $nodeName (Timeout)';
+              }
+            } else {
+              label = '⚪ $nodeName';
+            }
+
+            return system_tray.MenuItemLabel(
+              label: (now == nodeName ? '✔ ' : '  ') + label,
+              enabled: !isWaiting,
+              onClicked: (menuItem) => onProxyChange(groupName, nodeName),
+            );
+          }).toList();
+
+          menuItems.add(system_tray.SubMenu(
+            label: '$groupName: $now',
+            children: children,
+          ));
+        });
+      }
+
+      menuItems.add(system_tray.MenuSeparator());
+      if (isRunning) {
+        menuItems.addAll([
+          system_tray.MenuItemLabel(
+              label: I18n.s('Node Speed Test', '节点测速'),
+              enabled: !isWaiting,
+              onClicked: (menuItem) => onSpeedTest()),
+          system_tray.MenuItemLabel(
+              label: I18n.s('Dashboard', '控制面板'),
+              onClicked: (menuItem) => onOpenDashboard()),
+          system_tray.MenuItemLabel(
+              label: I18n.s('Reload Config', '重载配置'),
+              enabled: !isWaiting,
+              onClicked: (menuItem) => onReloadConfig()),
+        ]);
+      }
+      
+      menuItems.add(system_tray.MenuItemLabel(
+          label: I18n.s('Config Folder', '配置文件夹'),
+          onClicked: (menuItem) => onOpenConfigFolder()));
+
+      if (Platform.isMacOS) {
+        menuItems.add(system_tray.MenuItemLabel(label: I18n.s('Install Helper', '安装权限助手'), onClicked: (menuItem) => onInstallHelper()));
+      }
+
+      menuItems.add(system_tray.SubMenu(
+        label: I18n.s('About', '关于'),
+        children: [
+          system_tray.MenuItemLabel(label: 'App Version: $appVersion'),
+          system_tray.MenuItemLabel(label: 'Core Version: $clashVersion'),
+        ],
+      ));
+
+      menuItems.addAll([
+        system_tray.MenuItemLabel(label: I18n.s('Hide', '隐藏'), onClicked: (menuItem) => onHide()),
+        system_tray.MenuSeparator(),
+        system_tray.MenuItemLabel(label: I18n.s('Exit', '退出'), onClicked: (menuItem) => onQuit()),
+        system_tray.MenuItemLabel(label: I18n.s('Stop & Exit', '停止并退出'), onClicked: (menuItem) => onStopAndQuit()),
+      ]);
+
+      await menu.buildFrom(menuItems);
+      
+      // 关键修复：延迟更新，确保避开当前菜单事件的回调锁定周期
+      await Future.delayed(const Duration(milliseconds: 100));
+      await _systemTray.setContextMenu(menu);
+    } finally {
+      _isUpdating = false;
+    }
   }
 
   void setTitle(String title) {

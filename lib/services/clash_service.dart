@@ -34,6 +34,22 @@ class ClashService {
     }
   }
 
+  static Future<String> getClashVersion() async {
+    try {
+      var coreExePath = PlatformUtils.getCoreExePath();
+      var result = await Process.run(coreExePath, ['-v']);
+      if (result.exitCode == 0) {
+        var output = result.stdout.toString().trim();
+        if (output.isNotEmpty) {
+          return output.split('\n').first;
+        }
+      }
+    } catch (e) {
+      debugPrint("getClashVersion error: $e");
+    }
+    return 'Unknown';
+  }
+
   Future<String> getActiveProfile() async {
     try {
       var folder = await getWorkDir();
@@ -157,6 +173,26 @@ class ClashService {
       }
     }
     return null;
+  }
+
+  Future<int> getProxyDelay(String name) async {
+    var nameEncoded = Uri.encodeComponent(name);
+    var url = 'http://www.apple.com/library/test/success.html';
+    var urlEncoded = Uri.encodeComponent(url);
+    var uri = Uri.parse('$_apiBaseUrl/proxies/$nameEncoded/delay?timeout=5000&url=$urlEncoded');
+    
+    try {
+      var response = await http.get(uri);
+      if (response.statusCode == 200) {
+        var data = jsonDecode(response.body);
+        return data['delay'] as int;
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print("Test delay failed for $name: $e");
+      }
+    }
+    return 0; // 0 represents timeout or error
   }
 
   Future<bool> selectProxy(String group, String proxy) async {

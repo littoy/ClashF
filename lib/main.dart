@@ -14,8 +14,10 @@ import 'services/clash_service.dart';
 import 'ui/home_page.dart';
 import 'utils/platform_utils.dart';
 
+const String appVersion = '1.5';
+
 void main() async {
-  String packageVersion = '1.5';
+  String packageVersion = appVersion;
   WidgetsFlutterBinding.ensureInitialized();
   // Must add this line.
   await windowManager.ensureInitialized();

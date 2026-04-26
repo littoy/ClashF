@@ -143,28 +143,44 @@ proxies:
   forbid-duration: 900
 - name: us3
   server: us3.apphaodian.com
-  port: 31689
-  type: trojan
-  password: "exXnbm!23Ab0oK"
+  type: vless
+  port: 443
   udp: true
+  uuid: 333cbe20-6cd3-4d85-bffe-94f39e368574
+  flow: xtls-rprx-vision
+  tls: true
+  servername: securemvt.apple.com
+  alpn:
+    - h2
+    - http/1.1
+  client-fingerprint: chrome
+  skip-cert-verify: false
+  reality-opts:
+    public-key: 03vnAABj2L7w181ntEc3GsFZeN8USvJc1Js3SV7cSQ0
+    short-id: 8f5e381c5eb38a09
   network: tcp
-  flow: "xtls-rprx-direct"
-  sni: 127.akdfj.com
-  timeout: 450
-  max-fail: 2
-  forbid-duration: 900
+  smux:
+    enabled: false
 - name: hkt2
   server: hk01.apphaodian.com
-  port: 27651
-  type: trojan
-  password: "exXnbm!23Ab0oK"
+  type: vless
+  port: 443
   udp: true
+  uuid: 333cbe20-6cd3-4d85-bffe-94f39e368574
+  flow: xtls-rprx-vision
+  tls: true
+  servername: swcdn.apple.com
+  alpn:
+    - h2
+    - http/1.1
+  client-fingerprint: chrome
+  skip-cert-verify: false
+  reality-opts:
+    public-key: 03vnAABj2L7w181ntEc3GsFZeN8USvJc1Js3SV7cSQ0
+    short-id: 8f5e381c5eb38a09
   network: tcp
-  flow: "xtls-rprx-direct"
-  sni: 127.akdfj.com
-  timeout: 450
-  max-fail: 2
-  forbid-duration: 900
+  smux:
+    enabled: false
 - name: home-best
   server: git.utmcus.cn
   port: 52008
@@ -183,10 +199,10 @@ proxy-groups:
     interval: 121
     proxies:
       - home-best
+      - hkt2
+      - us3
       - s-us3
       - s-ssg01
-      - us3
-      - hkt2
       - 全球直连
   - name: 全球直连
     type: select

@@ -1,0 +1,1 @@
+file=release/mac-arm64/ADS Manager Desktop Bridge.app platform=darwin type=distribution identityName=Developer ID Application: Rizwan Ullah (7ZMY67UB8D) identityHash=49B67BF79D992FE6FACF6C1F03B8ED0A5DF0ABFC provisioningProfile=none

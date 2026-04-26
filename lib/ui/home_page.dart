@@ -1,12 +1,15 @@
 import 'dart:io';
 import 'dart:collection';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:localstorage/localstorage.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../main.dart'; // for appVersion
 import '../services/clash_service.dart';
 import '../services/tray_service.dart';
 import '../services/websocket_service.dart';
@@ -40,18 +43,52 @@ class _HomePageState extends State<HomePage> with WindowListener {
   int _socksPort = 0;
   bool isWaiting = false;
   bool stopActionInProgress = false;
-  Icon _icon = const Icon(Icons.play_circle);
   
-  // Timer? _retryTimer;
+  String _clashVersion = 'Unknown';
+  Timer? _refreshTimer;
+
+  int get _currentSegmentIndex {
+    if (!_running) return 0;
+    if (_tunMode) return 2;
+    return 1;
+  }
+
+  Future<void> _setRunState(int index) async {
+    if (isWaiting) return;
+    
+    bool targetRunning = index != 0;
+    bool targetTun = index == 2;
+
+    if (_running == targetRunning && _tunMode == targetTun) {
+      return; 
+    }
+
+    if (_running != targetRunning) {
+      await _toggleRun();
+      if (targetRunning && _tunMode != targetTun) {
+         await Future.delayed(const Duration(milliseconds: 1000));
+         await _toggleTun();
+      }
+    } else if (_running && _tunMode != targetTun) {
+      await _toggleTun();
+    }
+  }
 
   @override
   void initState() {
     windowManager.addListener(this);
     super.initState();
     _init();
+    // 增加定时刷新，确保托盘数据不滞后
+    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
+      if (_running) {
+        _loadProxies();
+      }
+    });
   }
 
   void _init() async {
+    _clashVersion = await ClashService.getClashVersion();
     await _trayService.init(_showWindow, _onMenuOpen);
     var savedProfile = await _clashService.getActiveProfile();
     if (savedProfile.isEmpty) {
@@ -72,56 +109,60 @@ class _HomePageState extends State<HomePage> with WindowListener {
   }
 
   Future<void> _onMenuOpen() async {
-    _profiles = await _clashService.getConfigList();
-    if (!_profiles.contains(_activeProfile)) {
-      _profiles.insert(0, _activeProfile);
+    // 仅在非等待状态下静默刷新
+    if (!isWaiting) {
+      await _loadProxies();
     }
-    if (_profiles.isEmpty) {
-      _profiles.add('config.yaml');
-    }
-    await _loadProxies();
-    _updateTray();
   }
 
   Future<void> _changeProfile(String profile) async {
+    if (isWaiting) return;
     setState(() {
       _activeProfile = profile;
+      isWaiting = true;
     });
-    localStorage.setItem('active_profile', profile);
-    await _clashService.setActiveProfile(profile);
-    
-    String oldPort = ClashService.extPort;
-    await _clashService.changeProfile(profile, isRunning: _running);
-    
-    _profiles = await _clashService.getConfigList();
-    if (!_profiles.contains(_activeProfile)) {
-      _profiles.insert(0, _activeProfile);
-    }
-    if (_profiles.isEmpty) {
-      _profiles.add('config.yaml');
-    }
-    
-    if (oldPort != ClashService.extPort) {
-      _wsService.close();
-      if (_running) {
-        _connectWs();
+    _updateTray();
+
+    try {
+      localStorage.setItem('active_profile', profile);
+      await _clashService.setActiveProfile(profile);
+      
+      String oldPort = ClashService.extPort;
+      await _clashService.changeProfile(profile, isRunning: _running);
+      
+      _profiles = await _clashService.getConfigList();
+      if (!_profiles.contains(_activeProfile)) {
+        _profiles.insert(0, _activeProfile);
       }
+      
+      if (oldPort != ClashService.extPort) {
+        _wsService.close();
+        if (_running) {
+          _connectWs();
+        }
+      }
+      
+      await _loadConfig();
+      await _loadProxies();
+    } finally {
+      setState(() {
+        isWaiting = false;
+      });
+      _updateTray();
     }
-    
-    _loadConfig();
-    _loadProxies();
   }
 
   Future<void> _changeProxy(String groupName, String proxyName) async {
+    if (isWaiting) return;
     bool success = await _clashService.selectProxy(groupName, proxyName);
     if (success) {
       await _loadProxies();
-      _updateTray();
     }
   }
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     windowManager.removeListener(this);
     _wsService.close();
     super.dispose();
@@ -140,11 +181,11 @@ class _HomePageState extends State<HomePage> with WindowListener {
   }
 
   Future<void> _showWindow() async {
-    if (_running) {
-      await _loadProxies();
-    }
     await windowManager.show();
     await windowManager.setSkipTaskbar(false);
+    if (_running) {
+      _loadProxies();
+    }
   }
 
   Future<void> _hideWindow() async {
@@ -165,11 +206,14 @@ class _HomePageState extends State<HomePage> with WindowListener {
     _trayService.updateMenu(
       isRunning: _running,
       isTunMode: _tunMode,
+      isWaiting: isWaiting,
       mode: _mode,
       profiles: _profiles,
       activeProfile: _activeProfile,
       proxyGroups: _proxyGroups,
       proxyDelays: _proxyDelays,
+      appVersion: appVersion,
+      clashVersion: _clashVersion,
       onProxyChange: _changeProxy,
       onShow: _showWindow,
       onToggleRun: _toggleRun,
@@ -178,6 +222,8 @@ class _HomePageState extends State<HomePage> with WindowListener {
       onProfileChange: _changeProfile,
       onOpenDashboard: () => _openDashboard(),
       onReloadConfig: _reloadConfig,
+      onOpenConfigFolder: _openConfigFolder,
+      onSpeedTest: _speedTest,
       onInstallHelper: _clashService.installHelper,
       onHide: _hideWindow,
       onQuit: _quit,
@@ -185,32 +231,68 @@ class _HomePageState extends State<HomePage> with WindowListener {
     );
   }
 
-  Future<void> _toggleRun() async {
+  Future<void> _speedTest() async {
+    if (isWaiting || !_running) return;
     setState(() {
+      isWaiting = true;
+    });
+    _updateTray();
+
+    showToast(I18n.s('Testing latency...', '正在进行节点测速...'));
+    
+    try {
+      // Get current proxies to find all node names
+      var data = await _clashService.getProxies();
+      if (data != null && data['proxies'] != null) {
+        Map<String, dynamic> proxies = data['proxies'];
+        List<String> nodesToTest = [];
+        
+        proxies.forEach((key, value) {
+          // Typically we only want to test real nodes, not groups
+          if (value['type'] != 'Selector' && value['type'] != 'URLTest' && value['type'] != 'Fallback' && value['type'] != 'LoadBalance') {
+            nodesToTest.add(key);
+          }
+        });
+
+        // Test in parallel with a concurrency limit if needed, but for now simple parallel
+        await Future.wait(nodesToTest.map((name) => _clashService.getProxyDelay(name)));
+        
+        showToast(I18n.s('Speed test completed.', '节点测速完成'));
+      }
+    } finally {
+      setState(() {
+        isWaiting = false;
+      });
+      await _loadProxies();
+    }
+  }
+
+  Future<void> _toggleRun() async {
+    if (isWaiting) return;
+    setState(() {
+      isWaiting = true;
       _running = !_running;
       _tunMode = _running ? _tunMode : false;
       _runState = _running
           ? (_tunMode ? I18n.s('TUN mode', 'TUN模式') : I18n.s('Running', '运行中'))
           : I18n.s('Stopped', '已停止');
-      isWaiting = true;
       stopActionInProgress = !_running;
     });
+    _updateTray();
+
     try {
       await _clashService.switchCore(_running); 
       
       if (_running) {
-        Future.delayed(const Duration(seconds: 3), () {
-          _connectWs();
-          _loadConfig();
-          _loadProxies();
-        });
+        await Future.delayed(const Duration(seconds: 3));
+        _connectWs();
+        await _loadConfig();
+        await _loadProxies();
         setState(() {
-          _icon = const Icon(Icons.stop_circle);
           isWaiting = false;
         });
       } else {
         setState(() {
-          _icon = const Icon(Icons.play_circle);
           _tunMode = false;
           isWaiting = false;
           _proxyGroups = {};
@@ -219,41 +301,50 @@ class _HomePageState extends State<HomePage> with WindowListener {
         _trayService.setTitle('');
       }
     } catch (e) {
-       if (_running) {
-          Future.delayed(const Duration(seconds: 3), () {
-            _connectWs();
-          });
-          setState(() {
-            _running = false;
-            _icon = const Icon(Icons.play_circle);
-          });
-          showToast("Retry update status");
-       } else {
-         showToast("Stop error: $e");
-         setState(() {
-          _icon = const Icon(Icons.play_circle);
-          _tunMode = false;
-          isWaiting = false;
-        });
-        _trayService.setTitle('');
-       }
-       isWaiting = false;
+       showToast("Core error: $e");
+       setState(() {
+        isWaiting = false;
+      });
     }
     _updateTray();
   }
 
   Future<void> _toggleTun() async {
-    await _clashService.patchConfig('', _tunMode ? 'false' : 'true');
-    _loadConfig();
+    if (isWaiting) return;
+    setState(() {
+      isWaiting = true;
+    });
+    _updateTray();
+
+    try {
+      await _clashService.patchConfig('', _tunMode ? 'false' : 'true');
+      await _loadConfig();
+    } finally {
+      setState(() {
+        isWaiting = false;
+      });
+      _updateTray();
+    }
   }
 
   Future<void> _changeMode(String mode) async {
+    if (isWaiting) return;
     setState(() {
       _mode = mode;
+      isWaiting = true;
     });
-    await _clashService.patchConfig(mode, '');
-    _loadConfig();
-    _loadProxies();
+    _updateTray();
+
+    try {
+      await _clashService.patchConfig(mode, '');
+      await _loadConfig();
+      await _loadProxies();
+    } finally {
+      setState(() {
+        isWaiting = false;
+      });
+      _updateTray();
+    }
   }
 
   Future<void> _loadConfig() async {
@@ -268,16 +359,6 @@ class _HomePageState extends State<HomePage> with WindowListener {
             ? (_tunMode ? I18n.s('TUN mode', 'TUN模式') : I18n.s('Running', '运行中'))
             : I18n.s('Stopped', '已停止');
       });
-    } else {
-      if (!_running) {
-        setState(() {
-          _mode = '';
-          _port = 0;
-          _socksPort = 0;
-          _tunMode = false;
-          _runState = I18n.s('Stopped', '已停止');
-        });
-      }
     }
     _updateTray();
   }
@@ -294,7 +375,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
         if (value['history'] != null && value['history'] is List && (value['history'] as List).isNotEmpty) {
           var history = value['history'] as List;
           var last = history.last;
-          if (last['delay'] != null && last['delay'] > 0) {
+          if (last['delay'] != null) {
             delays[key] = last['delay'] as int;
           }
         }
@@ -309,6 +390,18 @@ class _HomePageState extends State<HomePage> with WindowListener {
       Map<String, dynamic> sortedGroups = {};
       var keys = groups.keys.toList();
       keys.remove('GLOBAL');
+      
+      if (groups.containsKey('GLOBAL') && groups['GLOBAL']['all'] is List) {
+        var globalAll = groups['GLOBAL']['all'] as List;
+        keys.sort((a, b) {
+          int indexA = globalAll.indexOf(a);
+          int indexB = globalAll.indexOf(b);
+          if (indexA == -1) indexA = 999999;
+          if (indexB == -1) indexB = 999999;
+          return indexA.compareTo(indexB);
+        });
+      }
+
       for (var k in keys) {
         sortedGroups[k] = groups[k];
       }
@@ -320,6 +413,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
         _proxyGroups = sortedGroups;
         _proxyDelays = delays;
       });
+      _updateTray(); // 确保数据更新到托盘
     }
   }
 
@@ -345,9 +439,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
         if (!_running && !stopActionInProgress) {
            _running = true;
            _runState = I18n.s('Running', '运行中');
-           _icon = const Icon(Icons.stop_circle);
            _loadProxies();
-           _updateTray();
         }
       });
     }, onError: (err) {
@@ -357,7 +449,6 @@ class _HomePageState extends State<HomePage> with WindowListener {
           if(!_wsService.isConnected() && retryCount < 5){
             _connectWs();
           }
-
         });
       }
     });
@@ -427,11 +518,31 @@ class _HomePageState extends State<HomePage> with WindowListener {
   }
 
   Future<void> _reloadConfig() async {
-    var ok = await _clashService.reloadConfig();
-    if (ok) {
-      _loadConfig();
-      _loadProxies();
+    if (isWaiting) return;
+    setState(() {
+      isWaiting = true;
+    });
+    _updateTray();
+
+    try {
+      var ok = await _clashService.reloadConfig();
+      if (ok) {
+        await _loadConfig();
+        await _loadProxies();
+      }
+    } finally {
+      setState(() {
+        isWaiting = false;
+      });
+      _updateTray();
     }
+  }
+
+  Color _getDelayColor(int? delay) {
+    if (delay == null) return Colors.transparent;
+    if (delay == 0) return Colors.red;
+    if (delay < 500) return Colors.green;
+    return Colors.orange;
   }
 
   @override
@@ -452,10 +563,47 @@ class _HomePageState extends State<HomePage> with WindowListener {
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
               Text(I18n.s('Clash Status:', '运行状态')),
-              Text(
-                _runState,
-                style: Theme.of(context).textTheme.titleSmall,
+              const SizedBox(height: 10),
+              CupertinoSlidingSegmentedControl<int>(
+                groupValue: _currentSegmentIndex,
+                thumbColor: Colors.blue,
+                children: {
+                  0: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Text(
+                        I18n.s('Off', '关'),
+                        style: TextStyle(
+                            color: _currentSegmentIndex == 0
+                                ? Colors.white
+                                : null),
+                      )),
+                  1: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Text(
+                        I18n.s('On', '开'),
+                        style: TextStyle(
+                            color: _currentSegmentIndex == 1
+                                ? Colors.white
+                                : null),
+                      )),
+                  2: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Text(
+                        I18n.s('Tun', '增强'),
+                        style: TextStyle(
+                            color: _currentSegmentIndex == 2
+                                ? Colors.white
+                                : null),
+                      )),
+                },
+                onValueChanged: (int? value) {
+                  if (isWaiting) return;
+                  if (value != null) {
+                    _setRunState(value);
+                  }
+                },
               ),
+              const SizedBox(height: 10),
               Text(
                 _speed,
               ),
@@ -475,7 +623,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
                 ),
                 const SizedBox(height: 10),
                 ElevatedButton(
-                  onPressed: _reloadConfig,
+                  onPressed: isWaiting ? null : _reloadConfig,
                   child: Text(I18n.s('Reload Config', '重载配置')),
                 ),
               ],
@@ -541,9 +689,11 @@ class _HomePageState extends State<HomePage> with WindowListener {
                                 children: displayProxies.map((dynamic value) {
                                   String nodeName = value.toString();
                                   bool isSelected = nodeName == currentProxy;
+                                  int? delay = _proxyDelays[nodeName];
+                                  Color statusColor = _getDelayColor(delay);
                                   
                                   return InkWell(
-                                    onTap: () {
+                                    onTap: isWaiting ? null : () {
                                       _changeProxy(groupName, nodeName);
                                     },
                                     borderRadius: BorderRadius.circular(16),
@@ -551,7 +701,12 @@ class _HomePageState extends State<HomePage> with WindowListener {
                                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                       decoration: BoxDecoration(
                                         color: isSelected ? Colors.blue : Colors.transparent,
-                                        border: Border.all(color: isSelected ? Colors.blue : Theme.of(context).dividerColor),
+                                        border: Border.all(
+                                          color: isSelected 
+                                            ? Colors.blue 
+                                            : (delay != null ? statusColor : Theme.of(context).dividerColor),
+                                          width: isSelected ? 1.0 : (delay != null ? 1.5 : 1.0),
+                                        ),
                                         borderRadius: BorderRadius.circular(16),
                                       ),
                                       child: Text(
@@ -595,11 +750,6 @@ class _HomePageState extends State<HomePage> with WindowListener {
             ],
           ),
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: isWaiting ? null : _toggleRun,
-        tooltip: 'Run/Stop',
-        child: _icon,
       ),
     );
   }
