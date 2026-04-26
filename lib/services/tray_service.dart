@@ -2,17 +2,18 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:system_tray/system_tray.dart' as system_tray;
-import 'package:window_manager/window_manager.dart';
 import '../utils/platform_utils.dart';
+import 'tray_menu_presenter.dart';
 
 class TrayService {
   final system_tray.SystemTray _systemTray = system_tray.SystemTray();
   bool _isUpdating = false;
 
-  Future<void> init(VoidCallback onShow, Future<void> Function() onMenuOpen) async {
+  Future<void> init(
+      VoidCallback onShow, Future<void> Function() onMenuOpen) async {
     String path =
         Platform.isWindows ? 'assets/app_icon.ico' : 'assets/app_icon.png';
-    
+
     await _systemTray.initSystemTray(
       title: "",
       iconPath: path,
@@ -21,13 +22,15 @@ class TrayService {
     _systemTray.registerSystemTrayEventHandler((eventName) async {
       debugPrint("eventName: $eventName");
       if (eventName == system_tray.kSystemTrayEventClick) {
-        // 立即弹出菜单，不等待刷新，确保响应速度
-        _systemTray.popUpContextMenu();
-        // 在后台静默刷新，为下一次打开做准备
-        onMenuOpen();
+        await TrayMenuPresenter(
+          refreshMenuData: onMenuOpen,
+          showMenu: _systemTray.popUpContextMenu,
+        ).openMenu();
       } else if (eventName == system_tray.kSystemTrayEventRightClick) {
-        _systemTray.popUpContextMenu();
-        onMenuOpen();
+        await TrayMenuPresenter(
+          refreshMenuData: onMenuOpen,
+          showMenu: _systemTray.popUpContextMenu,
+        ).openMenu();
       }
     });
   }
@@ -62,12 +65,16 @@ class TrayService {
     _isUpdating = true;
 
     try {
-      var runLabel = isRunning ? '✔ ' + I18n.s('Running', '运行中') : I18n.s('Run', '运行');
-      var tunLabel = isTunMode ? '✔ ' + I18n.s('TUN mode', '增强模式') : I18n.s('TUN mode', '增强模式');
+      var runLabel =
+          isRunning ? '✔ ${I18n.s('Running', '运行中')}' : I18n.s('Run', '运行');
+      var tunLabel = isTunMode
+          ? '✔ ${I18n.s('TUN mode', '增强模式')}'
+          : I18n.s('TUN mode', '增强模式');
       final system_tray.Menu menu = system_tray.Menu();
 
       List<system_tray.MenuItemBase> menuItems = [
-        system_tray.MenuItemLabel(label: I18n.s('Show', '显示'), onClicked: (menuItem) => onShow()),
+        system_tray.MenuItemLabel(
+            label: I18n.s('Show', '显示'), onClicked: (menuItem) => onShow()),
         system_tray.MenuItemLabel(
             label: runLabel,
             enabled: !isWaiting,
@@ -104,11 +111,14 @@ class TrayService {
         ),
         system_tray.SubMenu(
           label: I18n.s("Profiles", "配置文件"),
-          children: profiles.where((p) => p != 'new_fb_config.yaml').map((p) => system_tray.MenuItemLabel(
-            label: (activeProfile == p ? '✔' : '') + p,
-            enabled: !isWaiting,
-            onClicked: (menuItem) => onProfileChange(p),
-          )).toList(),
+          children: profiles
+              .where((p) => p != 'new_fb_config.yaml')
+              .map((p) => system_tray.MenuItemLabel(
+                    label: (activeProfile == p ? '✔' : '') + p,
+                    enabled: !isWaiting,
+                    onClicked: (menuItem) => onProfileChange(p),
+                  ))
+              .toList(),
         ),
       ]);
 
@@ -117,11 +127,11 @@ class TrayService {
         proxyGroups.forEach((groupName, groupData) {
           String now = groupData['now'] ?? '';
           List<dynamic> all = groupData['all'] ?? [];
-          
+
           List<system_tray.MenuItemBase> children = all.map((node) {
             String nodeName = node.toString();
             String label = nodeName;
-            
+
             if (proxyDelays.containsKey(nodeName)) {
               int delay = proxyDelays[nodeName]!;
               if (delay > 0) {
@@ -164,13 +174,15 @@ class TrayService {
               onClicked: (menuItem) => onReloadConfig()),
         ]);
       }
-      
+
       menuItems.add(system_tray.MenuItemLabel(
           label: I18n.s('Config Folder', '配置文件夹'),
           onClicked: (menuItem) => onOpenConfigFolder()));
 
       if (Platform.isMacOS) {
-        menuItems.add(system_tray.MenuItemLabel(label: I18n.s('Install Helper', '安装权限助手'), onClicked: (menuItem) => onInstallHelper()));
+        menuItems.add(system_tray.MenuItemLabel(
+            label: I18n.s('Install Helper', '安装权限助手'),
+            onClicked: (menuItem) => onInstallHelper()));
       }
 
       menuItems.add(system_tray.SubMenu(
@@ -182,14 +194,18 @@ class TrayService {
       ));
 
       menuItems.addAll([
-        system_tray.MenuItemLabel(label: I18n.s('Hide', '隐藏'), onClicked: (menuItem) => onHide()),
+        system_tray.MenuItemLabel(
+            label: I18n.s('Hide', '隐藏'), onClicked: (menuItem) => onHide()),
         system_tray.MenuSeparator(),
-        system_tray.MenuItemLabel(label: I18n.s('Exit', '退出'), onClicked: (menuItem) => onQuit()),
-        system_tray.MenuItemLabel(label: I18n.s('Stop & Exit', '停止并退出'), onClicked: (menuItem) => onStopAndQuit()),
+        system_tray.MenuItemLabel(
+            label: I18n.s('Exit', '退出'), onClicked: (menuItem) => onQuit()),
+        system_tray.MenuItemLabel(
+            label: I18n.s('Stop & Exit', '停止并退出'),
+            onClicked: (menuItem) => onStopAndQuit()),
       ]);
 
       await menu.buildFrom(menuItems);
-      
+
       // 关键修复：延迟更新，确保避开当前菜单事件的回调锁定周期
       await Future.delayed(const Duration(milliseconds: 100));
       await _systemTray.setContextMenu(menu);

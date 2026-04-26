@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:collection';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -30,7 +29,6 @@ class _HomePageState extends State<HomePage> with WindowListener {
   final TrayService _trayService = TrayService();
 
   bool _running = false;
-  String _runState = 'Stopped';
   bool _tunMode = false;
   String _speed = '';
   String _mode = '';
@@ -38,12 +36,12 @@ class _HomePageState extends State<HomePage> with WindowListener {
   List<String> _profiles = [];
   Map<String, dynamic> _proxyGroups = {};
   Map<String, int> _proxyDelays = {};
-  Map<String, bool> _expandedGroups = {};
+  final Map<String, bool> _expandedGroups = {};
   int _port = 0;
   int _socksPort = 0;
   bool isWaiting = false;
   bool stopActionInProgress = false;
-  
+
   String _clashVersion = 'Unknown';
   Timer? _refreshTimer;
 
@@ -55,19 +53,19 @@ class _HomePageState extends State<HomePage> with WindowListener {
 
   Future<void> _setRunState(int index) async {
     if (isWaiting) return;
-    
+
     bool targetRunning = index != 0;
     bool targetTun = index == 2;
 
     if (_running == targetRunning && _tunMode == targetTun) {
-      return; 
+      return;
     }
 
     if (_running != targetRunning) {
       await _toggleRun();
       if (targetRunning && _tunMode != targetTun) {
-         await Future.delayed(const Duration(milliseconds: 1000));
-         await _toggleTun();
+        await Future.delayed(const Duration(milliseconds: 1000));
+        await _toggleTun();
       }
     } else if (_running && _tunMode != targetTun) {
       await _toggleTun();
@@ -103,9 +101,9 @@ class _HomePageState extends State<HomePage> with WindowListener {
       _profiles.add('config.yaml');
     }
     _connectWs();
-    _loadConfig();
-    _loadProxies();
-    _updateTray();
+    await _loadConfig();
+    await _loadProxies();
+    await _updateTray();
   }
 
   Future<void> _onMenuOpen() async {
@@ -121,34 +119,34 @@ class _HomePageState extends State<HomePage> with WindowListener {
       _activeProfile = profile;
       isWaiting = true;
     });
-    _updateTray();
+    await _updateTray();
 
     try {
       localStorage.setItem('active_profile', profile);
       await _clashService.setActiveProfile(profile);
-      
+
       String oldPort = ClashService.extPort;
       await _clashService.changeProfile(profile, isRunning: _running);
-      
+
       _profiles = await _clashService.getConfigList();
       if (!_profiles.contains(_activeProfile)) {
         _profiles.insert(0, _activeProfile);
       }
-      
+
       if (oldPort != ClashService.extPort) {
         _wsService.close();
         if (_running) {
           _connectWs();
         }
       }
-      
+
       await _loadConfig();
       await _loadProxies();
     } finally {
       setState(() {
         isWaiting = false;
       });
-      _updateTray();
+      await _updateTray();
     }
   }
 
@@ -202,8 +200,8 @@ class _HomePageState extends State<HomePage> with WindowListener {
     await windowManager.destroy();
   }
 
-  void _updateTray() {
-    _trayService.updateMenu(
+  Future<void> _updateTray() {
+    return _trayService.updateMenu(
       isRunning: _running,
       isTunMode: _tunMode,
       isWaiting: isWaiting,
@@ -236,27 +234,31 @@ class _HomePageState extends State<HomePage> with WindowListener {
     setState(() {
       isWaiting = true;
     });
-    _updateTray();
+    await _updateTray();
 
     showToast(I18n.s('Testing latency...', '正在进行节点测速...'));
-    
+
     try {
       // Get current proxies to find all node names
       var data = await _clashService.getProxies();
       if (data != null && data['proxies'] != null) {
         Map<String, dynamic> proxies = data['proxies'];
         List<String> nodesToTest = [];
-        
+
         proxies.forEach((key, value) {
           // Typically we only want to test real nodes, not groups
-          if (value['type'] != 'Selector' && value['type'] != 'URLTest' && value['type'] != 'Fallback' && value['type'] != 'LoadBalance') {
+          if (value['type'] != 'Selector' &&
+              value['type'] != 'URLTest' &&
+              value['type'] != 'Fallback' &&
+              value['type'] != 'LoadBalance') {
             nodesToTest.add(key);
           }
         });
 
         // Test in parallel with a concurrency limit if needed, but for now simple parallel
-        await Future.wait(nodesToTest.map((name) => _clashService.getProxyDelay(name)));
-        
+        await Future.wait(
+            nodesToTest.map((name) => _clashService.getProxyDelay(name)));
+
         showToast(I18n.s('Speed test completed.', '节点测速完成'));
       }
     } finally {
@@ -273,16 +275,13 @@ class _HomePageState extends State<HomePage> with WindowListener {
       isWaiting = true;
       _running = !_running;
       _tunMode = _running ? _tunMode : false;
-      _runState = _running
-          ? (_tunMode ? I18n.s('TUN mode', 'TUN模式') : I18n.s('Running', '运行中'))
-          : I18n.s('Stopped', '已停止');
       stopActionInProgress = !_running;
     });
-    _updateTray();
+    await _updateTray();
 
     try {
-      await _clashService.switchCore(_running); 
-      
+      await _clashService.switchCore(_running);
+
       if (_running) {
         await Future.delayed(const Duration(seconds: 3));
         _connectWs();
@@ -301,12 +300,12 @@ class _HomePageState extends State<HomePage> with WindowListener {
         _trayService.setTitle('');
       }
     } catch (e) {
-       showToast("Core error: $e");
-       setState(() {
+      showToast("Core error: $e");
+      setState(() {
         isWaiting = false;
       });
     }
-    _updateTray();
+    await _updateTray();
   }
 
   Future<void> _toggleTun() async {
@@ -314,7 +313,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
     setState(() {
       isWaiting = true;
     });
-    _updateTray();
+    await _updateTray();
 
     try {
       await _clashService.patchConfig('', _tunMode ? 'false' : 'true');
@@ -323,7 +322,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
       setState(() {
         isWaiting = false;
       });
-      _updateTray();
+      await _updateTray();
     }
   }
 
@@ -333,7 +332,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
       _mode = mode;
       isWaiting = true;
     });
-    _updateTray();
+    await _updateTray();
 
     try {
       await _clashService.patchConfig(mode, '');
@@ -343,7 +342,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
       setState(() {
         isWaiting = false;
       });
-      _updateTray();
+      await _updateTray();
     }
   }
 
@@ -355,12 +354,9 @@ class _HomePageState extends State<HomePage> with WindowListener {
         _port = config['port'] ?? 0;
         _socksPort = config['socks-port'] ?? 0;
         _tunMode = config['tun']?['enable'] ?? false;
-        _runState = _running
-            ? (_tunMode ? I18n.s('TUN mode', 'TUN模式') : I18n.s('Running', '运行中'))
-            : I18n.s('Stopped', '已停止');
       });
     }
-    _updateTray();
+    await _updateTray();
   }
 
   Future<void> _loadProxies() async {
@@ -370,9 +366,11 @@ class _HomePageState extends State<HomePage> with WindowListener {
       Map<String, dynamic> proxies = data['proxies'];
       Map<String, dynamic> groups = {};
       Map<String, int> delays = {};
-      
+
       proxies.forEach((key, value) {
-        if (value['history'] != null && value['history'] is List && (value['history'] as List).isNotEmpty) {
+        if (value['history'] != null &&
+            value['history'] is List &&
+            (value['history'] as List).isNotEmpty) {
           var history = value['history'] as List;
           var last = history.last;
           if (last['delay'] != null) {
@@ -380,17 +378,22 @@ class _HomePageState extends State<HomePage> with WindowListener {
           }
         }
 
-        if (value['all'] != null && value['all'] is List && (value['all'] as List).isNotEmpty) {
-          if (value['type'] == 'Selector' || value['type'] == 'URLTest' || value['type'] == 'Fallback' || value['type'] == 'LoadBalance') {
-             groups[key] = value;
+        if (value['all'] != null &&
+            value['all'] is List &&
+            (value['all'] as List).isNotEmpty) {
+          if (value['type'] == 'Selector' ||
+              value['type'] == 'URLTest' ||
+              value['type'] == 'Fallback' ||
+              value['type'] == 'LoadBalance') {
+            groups[key] = value;
           }
         }
       });
-      
+
       Map<String, dynamic> sortedGroups = {};
       var keys = groups.keys.toList();
       keys.remove('GLOBAL');
-      
+
       if (groups.containsKey('GLOBAL') && groups['GLOBAL']['all'] is List) {
         var globalAll = groups['GLOBAL']['all'] as List;
         keys.sort((a, b) {
@@ -413,7 +416,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
         _proxyGroups = sortedGroups;
         _proxyDelays = delays;
       });
-      _updateTray(); // 确保数据更新到托盘
+      await _updateTray(); // 确保数据更新到托盘
     }
   }
 
@@ -437,16 +440,15 @@ class _HomePageState extends State<HomePage> with WindowListener {
         _speed =
             "${_getBWHumanString(up)}↑ ${_getBWHumanString(down)}↓ ${I18n.s('Connections', '连接数')}: ${stat['count']}";
         if (!_running && !stopActionInProgress) {
-           _running = true;
-           _runState = I18n.s('Running', '运行中');
-           _loadProxies();
+          _running = true;
+          _loadProxies();
         }
       });
     }, onError: (err) {
       if (_running) {
         Future.delayed(const Duration(seconds: 2), () {
           retryCount++;
-          if(!_wsService.isConnected() && retryCount < 5){
+          if (!_wsService.isConnected() && retryCount < 5) {
             _connectWs();
           }
         });
@@ -469,11 +471,14 @@ class _HomePageState extends State<HomePage> with WindowListener {
     if (!await windowManager.isVisible()) {
       await windowManager.show();
     }
-    final url = 'http://127.0.0.1:8571/index.html?hostname=127.0.0.1&port=${ClashService.extPort}#/proxies';
+    final url =
+        'http://127.0.0.1:8571/index.html?hostname=127.0.0.1&port=${ClashService.extPort}#/proxies';
     if (Platform.isMacOS || Platform.isWindows) {
       Size oldSize = await windowManager.getSize();
       final width = View.of(context).physicalSize.width;
-      await windowManager.setSize(Size(width > 1280 ? 1200 : 860, 650),);
+      await windowManager.setSize(
+        Size(width > 1280 ? 1200 : 860, 650),
+      );
       await windowManager.center();
 
       await Navigator.push(
@@ -522,7 +527,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
     setState(() {
       isWaiting = true;
     });
-    _updateTray();
+    await _updateTray();
 
     try {
       var ok = await _clashService.reloadConfig();
@@ -534,7 +539,7 @@ class _HomePageState extends State<HomePage> with WindowListener {
       setState(() {
         isWaiting = false;
       });
-      _updateTray();
+      await _updateTray();
     }
   }
 
@@ -643,22 +648,33 @@ class _HomePageState extends State<HomePage> with WindowListener {
                       String currentProxy = entry.value['now'] ?? '';
                       String groupType = entry.value['type'] ?? 'Selector';
                       List<dynamic> allProxies = entry.value['all'] ?? [];
-                      
+
                       bool isExpanded = _expandedGroups[groupName] ?? false;
                       bool showExpandButton = allProxies.length > 8;
-                      List<dynamic> displayProxies = isExpanded || !showExpandButton ? allProxies : allProxies.take(8).toList();
-                      
-                      if (!isExpanded && showExpandButton && !displayProxies.contains(currentProxy) && currentProxy.isNotEmpty) {
-                         if (displayProxies.isNotEmpty) {
-                           displayProxies[displayProxies.length - 1] = currentProxy;
-                         }
+                      List<dynamic> displayProxies =
+                          isExpanded || !showExpandButton
+                              ? allProxies
+                              : allProxies.take(8).toList();
+
+                      if (!isExpanded &&
+                          showExpandButton &&
+                          !displayProxies.contains(currentProxy) &&
+                          currentProxy.isNotEmpty) {
+                        if (displayProxies.isNotEmpty) {
+                          displayProxies[displayProxies.length - 1] =
+                              currentProxy;
+                        }
                       }
-                      
+
                       return Container(
                         margin: const EdgeInsets.only(bottom: 12),
                         padding: const EdgeInsets.only(bottom: 12),
                         decoration: BoxDecoration(
-                          border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor.withOpacity(0.5))),
+                          border: Border(
+                              bottom: BorderSide(
+                                  color: Theme.of(context)
+                                      .dividerColor
+                                      .withOpacity(0.5))),
                         ),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -668,15 +684,21 @@ class _HomePageState extends State<HomePage> with WindowListener {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(groupName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                  Text(groupName,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14)),
                                   const SizedBox(height: 6),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 2),
                                     decoration: BoxDecoration(
                                       border: Border.all(color: Colors.blue),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
-                                    child: Text(groupType, style: const TextStyle(color: Colors.blue, fontSize: 11)),
+                                    child: Text(groupType,
+                                        style: const TextStyle(
+                                            color: Colors.blue, fontSize: 11)),
                                   ),
                                 ],
                               ),
@@ -691,28 +713,43 @@ class _HomePageState extends State<HomePage> with WindowListener {
                                   bool isSelected = nodeName == currentProxy;
                                   int? delay = _proxyDelays[nodeName];
                                   Color statusColor = _getDelayColor(delay);
-                                  
+
                                   return InkWell(
-                                    onTap: isWaiting ? null : () {
-                                      _changeProxy(groupName, nodeName);
-                                    },
+                                    onTap: isWaiting
+                                        ? null
+                                        : () {
+                                            _changeProxy(groupName, nodeName);
+                                          },
                                     borderRadius: BorderRadius.circular(16),
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12, vertical: 6),
                                       decoration: BoxDecoration(
-                                        color: isSelected ? Colors.blue : Colors.transparent,
+                                        color: isSelected
+                                            ? Colors.blue
+                                            : Colors.transparent,
                                         border: Border.all(
-                                          color: isSelected 
-                                            ? Colors.blue 
-                                            : (delay != null ? statusColor : Theme.of(context).dividerColor),
-                                          width: isSelected ? 1.0 : (delay != null ? 1.5 : 1.0),
+                                          color: isSelected
+                                              ? Colors.blue
+                                              : (delay != null
+                                                  ? statusColor
+                                                  : Theme.of(context)
+                                                      .dividerColor),
+                                          width: isSelected
+                                              ? 1.0
+                                              : (delay != null ? 1.5 : 1.0),
                                         ),
                                         borderRadius: BorderRadius.circular(16),
                                       ),
                                       child: Text(
                                         _getProxyDisplayName(nodeName),
                                         style: TextStyle(
-                                          color: isSelected ? Colors.white : Theme.of(context).textTheme.bodyMedium?.color,
+                                          color: isSelected
+                                              ? Colors.white
+                                              : Theme.of(context)
+                                                  .textTheme
+                                                  .bodyMedium
+                                                  ?.color,
                                           fontSize: 12,
                                         ),
                                       ),
@@ -731,13 +768,18 @@ class _HomePageState extends State<HomePage> with WindowListener {
                                     });
                                   },
                                   style: TextButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 4, vertical: 0),
                                     minimumSize: Size.zero,
-                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
                                   ),
                                   child: Text(
-                                    isExpanded ? I18n.s('Collapse', '收起') : I18n.s('Expand', '展开'),
-                                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                    isExpanded
+                                        ? I18n.s('Collapse', '收起')
+                                        : I18n.s('Expand', '展开'),
+                                    style: const TextStyle(
+                                        fontSize: 12, color: Colors.grey),
                                   ),
                                 ),
                               ),
@@ -782,20 +824,20 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
       body: SafeArea(
         child: InAppWebView(
-        initialUrlRequest: URLRequest(url: WebUri(widget.url)),
-        initialSettings: InAppWebViewSettings(
-          userAgent:
-              'Mozilla/5.0 (iPhone; CPU iPhone OS 14_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1',
+          initialUrlRequest: URLRequest(url: WebUri(widget.url)),
+          initialSettings: InAppWebViewSettings(
+            userAgent:
+                'Mozilla/5.0 (iPhone; CPU iPhone OS 14_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1',
+          ),
+          onWebViewCreated: (controller) {
+            webViewController = controller;
+          },
+          onLoadStart: (controller, url) {},
+          onLoadStop: (controller, url) {},
+          onReceivedError: (controller, request, error) {
+            showToast("Load dashboard failed.");
+          },
         ),
-        onWebViewCreated: (controller) {
-          webViewController = controller;
-        },
-        onLoadStart: (controller, url) {},
-        onLoadStop: (controller, url) {},
-        onReceivedError: (controller, request, error) {
-          showToast("Load dashboard failed.");
-        },
-      ),
       ),
     );
   }
