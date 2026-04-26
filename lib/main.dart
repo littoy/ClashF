@@ -26,7 +26,7 @@ void main() async {
   windowManager.waitUntilReadyToShow().then((_) async {
     // Hide window title bar
     if (Platform.isMacOS) await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
-    await windowManager.setSize(const Size(290, 460));
+    await windowManager.setSize(const Size(800, 600));
     await windowManager.center();
     await windowManager.hide();
     await windowManager.setSkipTaskbar(true);
