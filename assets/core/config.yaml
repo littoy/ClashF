@@ -181,6 +181,26 @@ proxies:
   network: tcp
   smux:
     enabled: false
+- name: 'hkt5-sg01'
+  type: vless
+  server: hkt5.apphaodian.com
+  port: 443
+  udp: true
+  uuid: 333cbe20-6cd3-4d85-bffe-94f39e368574
+  flow: xtls-rprx-vision
+  tls: true
+  servername: sfss.cdn-apple.com
+  alpn:
+    - h2
+    - http/1.1
+  client-fingerprint: chrome
+  skip-cert-verify: false
+  reality-opts:
+    public-key: 03vnAABj2L7w181ntEc3GsFZeN8USvJc1Js3SV7cSQ0
+    short-id: 8f5e381c5eb38a09
+  network: tcp
+  smux:
+    enabled: false
 - name: home-best
   server: git.utmcus.cn
   port: 52008
@@ -198,13 +218,29 @@ proxy-groups:
     url: 'https://www.gstatic.com/generate_204'
     interval: 121
     proxies:
+      - ♻️ 最快节点
       - home-best
       - hkt2
       - us3
       - s-us3
       - s-ssg01
-      - 全球直连
-  - name: 全球直连
+      - hkt5-sg01
+      - 香港卡选这个
+  - name: ♻️ 最快节点
+    type: url-test
+    disable-udp: false
+    url: 'https://www.gstatic.com/generate_204'
+    interval: 61
+    tolerance: 55
+    proxies:
+      - home-best
+      - hkt2
+      - us3
+      - s-us3
+      - s-ssg01
+      - hkt5-sg01
+      - 香港卡选这个
+  - name: 香港卡选这个
     type: select
     proxies:
       - DIRECT
@@ -220,6 +256,6 @@ proxy-groups:
       - DIRECT
 
 rules:
-  - GEOIP,CN,全球直连,no-resolve
+  - GEOIP,CN,香港卡选这个,no-resolve
   - MATCH,🔰 节点选择
   
