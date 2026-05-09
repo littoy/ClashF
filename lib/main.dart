@@ -115,6 +115,18 @@ void main() async {
 
     localStorage.setItem('ver', packageVersion);
   }
+  final clashService = ClashService();
+  var savedProfile = await clashService.getActiveProfile();
+  savedProfile = savedProfile.isNotEmpty
+      ? savedProfile
+      : (localStorage.getItem('active_profile')?.toString() ?? 'config.yaml');
+  final syncResult = await clashService.syncSelectedProfileToConfig(
+    preferredProfile: savedProfile,
+  );
+  if (syncResult.activeProfile != savedProfile) {
+    localStorage.setItem('active_profile', syncResult.activeProfile);
+    await clashService.setActiveProfile(syncResult.activeProfile);
+  }
   await ClashService.initExtPort();
   startHttpServer(join(PlatformUtils.getCoreDir(), 'public'));
   runApp(const MyApp());

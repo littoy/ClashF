@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:process_run/shell_run.dart';
 import 'package:yaml/yaml.dart';
 
+import 'profile_sync_service.dart';
 import '../utils/platform_utils.dart';
 
 class ClashService {
@@ -87,6 +88,21 @@ class ClashService {
     }
     return folder;
 
+  }
+
+  Future<ProfileSyncResult> syncSelectedProfileToConfig({
+    String? preferredProfile,
+  }) async {
+    final folder = await getWorkDir();
+    final result = await ProfileSyncService.syncSelectedProfile(
+      folder: folder,
+      preferredProfile: preferredProfile,
+    );
+    if (result.externalControllerPort != null &&
+        result.externalControllerPort!.isNotEmpty) {
+      extPort = result.externalControllerPort!;
+    }
+    return result;
   }
 
   Future<void> installHelper() async {
@@ -289,33 +305,26 @@ class ClashService {
     return list;
   }
 
-  Future<bool> changeProfile(String filename, {bool isRunning = false}) async {
+  Future<ProfileSyncResult?> changeProfile(String filename,
+      {bool isRunning = false}) async {
     try {
       var folder = await getWorkDir();
       var file = File(join(folder, filename));
-      if (!file.existsSync()) return false;
-      var configStr = await file.readAsString(encoding: const Utf8Codec(allowMalformed: true));
-      var doc = loadYaml(configStr);
-      
-      String? newExtPort;
-      if (doc != null && doc['external-controller'] != null) {
-          String extCtrl = doc['external-controller'].toString();
-          newExtPort = extCtrl.split(':').last;
-          if (kDebugMode) {
-            print("Found new port: $newExtPort");
-          }
+      if (!file.existsSync()) return null;
+      final oldExtPort = extPort;
+      final result =
+          await syncSelectedProfileToConfig(preferredProfile: filename);
+
+      if (kDebugMode) {
+        print("Found new port: ${result.externalControllerPort}");
       }
-      
-      if (filename != 'config.yaml') {
-        await file.copy(join(folder, 'config.yaml'));
-      }
-      
-      if (newExtPort != null && newExtPort != extPort) {
+
+      if (result.externalControllerPort != null &&
+          result.externalControllerPort != oldExtPort) {
         // Port changed! We must restart the core to apply this.
         if (isRunning) {
            await switchCore(false); // Stop
         }
-        extPort = newExtPort;
         if (isRunning) {
            await Future.delayed(const Duration(milliseconds: 600));
            await switchCore(true); // Start with new config
@@ -325,11 +334,11 @@ class ClashService {
           await reloadConfig();
         }
       }
-      showToast("Changed profile to $filename");
-      return true;
+      showToast("Changed profile to ${result.activeProfile}");
+      return result;
     } catch (e) {
       showToast("Change profile error: $e");
-      return false;
+      return null;
     }
   }
 

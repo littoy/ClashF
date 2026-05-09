@@ -122,11 +122,14 @@ class _HomePageState extends State<HomePage> with WindowListener {
     await _updateTray();
 
     try {
-      localStorage.setItem('active_profile', profile);
-      await _clashService.setActiveProfile(profile);
-
       String oldPort = ClashService.extPort;
-      await _clashService.changeProfile(profile, isRunning: _running);
+      final result =
+          await _clashService.changeProfile(profile, isRunning: _running);
+      final resolvedProfile = result?.activeProfile ?? profile;
+
+      localStorage.setItem('active_profile', resolvedProfile);
+      await _clashService.setActiveProfile(resolvedProfile);
+      _activeProfile = resolvedProfile;
 
       _profiles = await _clashService.getConfigList();
       if (!_profiles.contains(_activeProfile)) {
@@ -271,9 +274,32 @@ class _HomePageState extends State<HomePage> with WindowListener {
 
   Future<void> _toggleRun() async {
     if (isWaiting) return;
+    final targetRunning = !_running;
+
+    if (targetRunning) {
+      final syncResult = await _clashService.syncSelectedProfileToConfig(
+        preferredProfile: _activeProfile,
+      );
+      final resolvedProfile = syncResult.activeProfile;
+      if (resolvedProfile != _activeProfile) {
+        localStorage.setItem('active_profile', resolvedProfile);
+        await _clashService.setActiveProfile(resolvedProfile);
+      }
+
+      final refreshedProfiles = await _clashService.getConfigList();
+      if (!refreshedProfiles.contains(resolvedProfile)) {
+        refreshedProfiles.insert(0, resolvedProfile);
+      }
+
+      setState(() {
+        _activeProfile = resolvedProfile;
+        _profiles = refreshedProfiles;
+      });
+    }
+
     setState(() {
       isWaiting = true;
-      _running = !_running;
+      _running = targetRunning;
       _tunMode = _running ? _tunMode : false;
       stopActionInProgress = !_running;
     });

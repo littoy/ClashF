@@ -29,13 +29,14 @@ void showToast(String msg) {
   BuildContext? context = NavigationService.navigatorKey.currentContext;
   if(context != null){
     final scaffold = ScaffoldMessenger.of(context);
-    scaffold.showSnackBar(
+    final controller = scaffold.showSnackBar(
       SnackBar(
         content: Text(msg),
         action: SnackBarAction(label: I18n.s('Dismiss', '关闭'), onPressed: scaffold.hideCurrentSnackBar),
-        duration: const Duration(seconds: 1),
+        duration: const Duration(seconds: 5),
       ),
     );
+    Future<void>.delayed(const Duration(seconds: 5), controller.close);
   }
 }
 
